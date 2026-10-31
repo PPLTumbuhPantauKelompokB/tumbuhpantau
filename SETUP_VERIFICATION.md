@@ -57,3 +57,10 @@ npm run dev:frontend
 3. Hentikan terminal backend dengan Ctrl+C. Klik tombol yang sama. Status menjadi offline dan angka lama hilang. Nyalakan backend kembali dan klik tombol untuk memulihkan tampilan.
 4. Bila health langsung gagal, periksa terminal backend. Pesan EADDRINUSE berarti port sudah digunakan. Bila health langsung berhasil tetapi health melalui 5173 gagal, cocokkan target frontend/vite.config.js dengan port Express. Jika npm ci gagal, cek versi Node, koneksi ke registry dan keberadaan lockfile di root.
 5. Hentikan kedua server dengan Ctrl+C setelah demo. MySQL dapat diuji terpisah mengikuti bagian opsional README. .env hanya disimpan lokal.
+
+## Verifikasi DB-01 di laptop
+
+- Lingkungan: Windows, Laragon, database lokal `tumbuhpantau`.
+- Perintah dari folder utama proyek: `npm run db:check`.
+- Hasil: LULUS. Skrip backend berhasil login ke MySQL dan menjalankan `SELECT 1`.
+- Pesan terminal: `MySQL terhubung ke database 'tumbuhpantau'.`
