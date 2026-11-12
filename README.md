@@ -1,158 +1,190 @@
-# TumbuhPantau — Starter Development v0.1
+# TumbuhPantau - Sistem Pemantauan Tumbuh Kembang Balita
 
-**React + Vite (frontend) · Node.js + Express (backend) · MySQL (direncanakan)**  
-Tanggal: 30 Oktober 2026 · **Tujuan demo: 31 Oktober 2026**
+Repositori resmi pengembangan aplikasi **TumbuhPantau** (Fokus: **Sprint 1**).  
+Aplikasi web responsif untuk pencatatan dan pemantauan balita di tingkat Posyandu, Puskesmas, dan Dinas Kesehatan.
 
-> **STATUS:** Ini adalah foundation / starter project, **bukan** sistem kesehatan yang siap digunakan. Dashboard menggunakan **data sintetis**, tidak menggunakan data anak nyata. Login, database aplikasi, antropometri WHO, dan fitur operasional belum dibuat. Proposal akademik masih menyebut Laravel; perubahan stack menjadi React/Express **belum disinkronkan ke proposal**.
+---
 
-## Apa yang sudah ada
+## 1. Status Proyek: Sprint 1 (Selesai 100%)
 
-- UI dashboard React responsif dengan indikator simulasi dan ringkasan modul TumbuhPantau.
-- Express server dengan `GET /api/health` dan `GET /api/demo/overview` (seluruh data sintetis).
-- Integrasi Vite proxy `/api` ke backend; UI memperlihatkan koneksi API online/offline.
-- Test sederhana untuk memastikan data demo ditandai sebagai sintetis.
-- `docs/SDD.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/AI_CODING_GUIDELINES.md`, serta keputusan teknis.
-- Skrip **opsional** mengecek koneksi ke database MySQL; tidak ada schema yang dibuat.
+Sprint 1 mencakup 20 tiket Jira yang telah selesai diimplementasikan, diuji, dan diverifikasi:
 
-## Persyaratan
+1. **Fondasi & Basis Data (SCRUM-5, 6, 7, 8, 11, 34)**:
+   - Skema 12 tabel InnoDB dengan relasi foreign key dan audit log.
+   - Runner migrasi otomatis (`backend/scripts/migrate.js`) dan skrip DDL SQL (`001_init_schema.sql`).
+   - Seeder data awal (`backend/scripts/seed.js`) mencakup Dinkes, Puskesmas, Posyandu, Pengguna semua role, 60 Balita, 60 Wali, dan Sesi Kegiatan.
+2. **Autentikasi & RBAC (SCRUM-9, 10)**:
+   - Sesi cookie aman di MySQL (`express-mysql-session`), proteksi CSRF, rate limiting, hashing password bcrypt.
+   - Navigasi dan pembatasan akses berbasis peran (Superadmin, Kader, Petugas Puskesmas, Dinas Kesehatan).
+3. **Pengelolaan Data Balita & Wali (SCRUM-12 s.d. 19)**:
+   - Pendaftaran balita dengan generator kode internal unik otomatis (`MEL-0001`, dst.).
+   - Validasi usia (< 60 bulan) dan deteksi duplikasi.
+   - Pencarian, filter status, pengubahan identitas anak, dan pencatatan audit log.
+   - Penonaktifan anak (*soft delete* via `inactive_on`) tanpa menghapus riwayat.
+   - Pengelolaan data wali: tambah wali baru, lihat profil wali, perbarui kontak, dan lepas/ganti wali balita.
+4. **Pengelolaan Sesi Kegiatan Posyandu (SCRUM-20 s.d. 23)**:
+   - Pembukaan sesi posyandu baru pada tanggal kegiatan (pencegahan sesi ganda pada tanggal yang sama).
+   - Rekapitulasi daftar sesi beserta kehadiran dan sasaran anak.
+   - Detail sesi dan pencatatan kehadiran anak (Hadir / Tidak Hadir) secara langsung.
+   - Penyesuaian jadwal sesi selama status masih `open` dan pembatalan sesi kegiatan.
 
-- **Node.js 24 LTS direkomendasikan** (minimal 22.12 sesuai `package.json`) dan npm.
-- Editor kode seperti VS Code.
-- MySQL hanya dibutuhkan jika mau mencoba `db:check`, **tidak diperlukan untuk demo dashboard awal**.
-- Koneksi internet saat pertama kali `npm install` untuk mengunduh dependency.
+> **Catatan Batasan Sprint 1**:  
+> Fitur kalkulasi Z-Score kurva WHO, antrean peninjauan puskesmas, tindak lanjut intervensi, dan ekspor CSV sengaja dibatasi untuk **Sprint 2**.
 
-Cek versi:
+---
 
+## 2. Persyaratan Lingkungan (Prerequisites)
+
+- **Node.js**: Versi 20 LTS, 22 LTS, atau 24 LTS.
+- **npm**: Versi 10+.
+- **MySQL Database**: MySQL 8.0+ / 8.4 (Laragon, XAMPP, atau MySQL standalone lokal).
+- **Web Browser**: Google Chrome, Mozilla Firefox, atau Microsoft Edge versi terbaru.
+
+---
+
+## 3. Langkah Instalasi Cepat (Setup untuk Rekan Tim)
+
+Ikuti langkah-langkah berikut untuk menjalankan proyek di komputer lokal:
+
+### Langkah 1: Clone Repositori
 ```bash
-node -v
-npm -v
+git clone <URL_REPOSITORI_GITHUB>
+cd tumbuhpantau-main
 ```
 
-## Setup paling singkat
-
-**1.** Ekstrak ZIP, kemudian buka folder `tumbuhpantau-starter` di VS Code.
-
-**2.** Buka terminal pada **root project** (folder yang memuat `frontend/` dan `backend/`):
-
+### Langkah 2: Pasang Dependency
+Jalankan perintah ini di root folder proyek:
 ```bash
-npm ci
+npm install
 ```
 
-> `npm ci` memasang versi yang tercatat pada `package-lock.json` di root. Jika instalasi gagal karena jaringan, pastikan akses ke npm Registry tersedia.
+### Langkah 3: Siapkan Basis Data MySQL
+1. Pastikan servis MySQL lokal Anda telah berjalan (misalnya aktifkan MySQL di Laragon / XAMPP).
+2. Buat database baru bernama `tumbuhpantau` melalui HeidiSQL, phpMyAdmin, DBeaver, atau terminal MySQL:
+   ```sql
+   CREATE DATABASE IF NOT EXISTS tumbuhpantau CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
 
-**3.** Jalankan backend di **Terminal A**:
+### Langkah 4: Konfigurasi File Lingkungan (.env)
+Salin template konfigurasi dari `backend/.env.example` menjadi `backend/.env`:
 
+- **Windows (PowerShell)**:
+  ```powershell
+  Copy-Item backend/.env.example backend/.env
+  ```
+- **macOS / Linux**:
+  ```bash
+  cp backend/.env.example backend/.env
+  ```
+
+Buka `backend/.env` dan pastikan kredensial MySQL sesuai dengan setelan lokal Anda:
+```env
+PORT=3001
+NODE_ENV=development
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=tumbuhpantau
+DB_NAME_TEST=tumbuhpantau_test
+SESSION_SECRET=kunci-rahasia-sesi-lokal-tumbuhpantau-min-32-karakter
+SESSION_IDLE_MINUTES=30
+SEED_DEFAULT_PASSWORD=123456
+APP_TIMEZONE=Asia/Jakarta
+```
+*(Catatan: Jika MySQL Laragon default menggunakan user `root` tanpa password, biarkan `DB_PASSWORD=` kosong).*
+
+### Langkah 5: Jalankan Migrasi dan Seeder Data
+Dari root folder proyek, jalankan:
 ```bash
-npm run dev:backend
+# 1. Jalankan pembuatan 12 tabel InnoDB
+npm run db:migrate
+
+# 2. Isi database dengan data demo Sprint 1
+npm run db:seed
 ```
 
-Periksa di browser `http://127.0.0.1:3001/api/health`. Respons yang diharapkan:
+### Langkah 6: Jalankan Aplikasi
+Buka dua jendela terminal terpisah di root folder:
 
-```json
-{"status":"ok","service":"tumbuhpantau-api","version":"0.1.0","database":"not-checked"}
-```
+- **Terminal 1 (Backend API - Port 3001)**:
+  ```bash
+  npm run dev:backend
+  ```
+- **Terminal 2 (Frontend React - Port 5173)**:
+  ```bash
+  npm run dev:frontend
+  ```
 
-**4.** Jalankan frontend di **Terminal B**, dari root project:
+Buka peramban (browser) dan akses:  
+👉 **`http://localhost:5173`** (Landing Page interaktif)  
+👉 **`http://localhost:5173/login`** (Halaman masuk langsung)
+
+---
+
+## 4. Kredensial Akun Uji Coba (Demo)
+
+Semua akun demo di bawah ini menggunakan **Username** dan kata sandi yang sama:  
+🔑 **Password:** `123456`
+
+| Peran (Role) | Username Login | Akses Unit Kerja | Hak Akses Utama |
+| :--- | :--- | :--- | :--- |
+| **Kader Posyandu** | `kader.mlt01` | Posyandu Melati 01 | Pendaftaran balita, data wali, buka sesi posyandu, catat kehadiran |
+| **Petugas Puskesmas** | `petugas.melati` | Puskesmas Melati | Monitoring operasional balita & sesi wilayah kerja puskesmas, audit log |
+| **Dinas Kesehatan** | `dinas` | Dinas Kesehatan | Monitoring cakupan agregat wilayah & hierarki organisasi |
+| **Administrator** | `admin` | Sistem | Manajemen organisasi (Puskesmas/Posyandu), pengguna, & audit log sistem |
+
+*(Di halaman `/login` tersedia 4 tombol pintas: **Kader**, **Petugas**, **Dinas**, dan **Admin** yang langsung mengisi username dan sandi secara otomatis).*
+
+---
+
+## 5. Pengujian dan Verifikasi Mutu Kode
+
+Jalankan perintah berikut untuk memastikan aplikasi berfungsi tanpa kesalahan:
 
 ```bash
-npm run dev:frontend
-```
+# Menjalankan 10 unit test otomatis backend
+npm test
 
-Buka `http://127.0.0.1:5173` di browser. Halaman dashboard akan menampilkan indikator **API terhubung** dan angka demonstrasi sintetis.
-
-**5.** Jalankan pengujian di **Terminal C**:
-
-```bash
-npm run test
+# Memeriksa sintaks seluruh berkas JavaScript backend
 npm run check
+
+# Memastikan build frontend berhasil tanpa error
+npm run build
 ```
 
-Jika aplikasi tidak bisa mengambil data, periksa terlebih dahulu Terminal A, kemudian klik **Periksa koneksi lagi** pada dashboard.
+---
 
-## Opsional: cek MySQL lokal
-
-Belum ada migration/tabel database karena desain ORM/migration sedang diputuskan tim.
-
-1. Jalankan MySQL dan buat database kosong `tumbuhpantau` menggunakan tool MySQL favoritmu.
-2. Salin `backend/.env.example` menjadi `backend/.env`, lalu isi konfigurasi `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` sesuai MySQL lokal.
-3. Jalankan `npm run db:check` dari root project.
-
-**PowerShell (Windows)**:
-
-```powershell
-Copy-Item backend/.env.example backend/.env
-```
-
-**macOS / Linux**:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-File `.env` dikecualikan dari Git. Jangan menaruh identitas anak atau data pribadi pada seed/demo.
-
-## Struktur project
+## 6. Struktur Direktori Proyek
 
 ```text
-tumbuhpantau-starter/
+tumbuhpantau-main/
+├── backend/
+│   ├── db/
+│   │   └── migrations/        # Berkas DDL SQL berversi (001_init_schema.sql)
+│   ├── scripts/               # Runner migrasi, seeder, dan syntax checker
+│   ├── src/
+│   │   ├── config/            # Konfigurasi database pool, environment, sesi
+│   │   ├── middleware/        # Autentikasi sesi, CSRF, RBAC, error handler
+│   │   ├── modules/           # Modul logika bisnis: auth, children, guardians, sessions, admin
+│   │   ├── app.js             # Express application setup
+│   │   └── server.js          # Entry point Express listener
+│   └── tests/                 # Unit test otomatis
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx           # UI prototipe dan fetch API
-│   │   ├── main.jsx          # titik masuk React
-│   │   └── styles.css        # styling dashboard responsif
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js        # proxy ke backend
-├── backend/
-│   ├── src/
-│   │   ├── app.js            # routing Express
-│   │   ├── server.js         # server listen di port 3001
-│   │   └── demo-data.js      # fixture sintetis
-│   ├── scripts/check-db.js   # ping MySQL opsional
-│   ├── tests/demo-data.test.js
-│   ├── .env.example
-│   └── package.json
-├── docs/
-│   ├── SDD.md
-│   ├── IMPLEMENTATION_PLAN.md
-│   ├── AI_CODING_GUIDELINES.md
-│   ├── DECISIONS_AND_OPEN_QUESTIONS.md
-│   ├── TEST_PLAN.md
-│   └── BEGINNER_SETUP_GUIDE.md
-├── package.json
-├── .gitignore
-└── README.md
+│   │   ├── components/        # Layout AppShell, Navbar, Modal konfirmasi
+│   │   ├── context/           # AuthContext & Session management
+│   │   ├── pages/             # Halaman: Login, Dashboard, Balita, Wali, Sesi, Admin
+│   │   ├── services/          # Klien API fetch terstandarisasi (client.js)
+│   │   ├── App.jsx            # Routing dan Role Guards
+│   │   └── main.jsx           # Entry point React Vite
+├── docs/                      # Dokumentasi PROGRESS.md, PRD, SDD, alur kerja
+├── package.json               # Root workspace konfigurasi
+└── README.md                  # Dokumentasi panduan ini
 ```
 
-## Endpoint awal
+---
 
-| Method | URL | Keterangan |
-|---|---|---|
-| GET | `/api/health` | Health-check Express saja; **tidak memverifikasi koneksi DB** |
-| GET | `/api/demo/overview` | Data sintetis, publik, untuk demo UI awal; **bukan API klinis** |
+## 7. Lisensi dan Ketentuan
 
-**Jangan** menambahkan endpoint pasien atau pengukuran tanpa autentikasi dan pembatasan organisasi pada backend.
-
-## Memulai Git
-
-Setelah instalasi dan pengujian:
-
-```bash
-git init
-git add .
-git commit -m "chore: scaffold tumbuhpantau react express"
-```
-
-Cek `git status` terlebih dahulu agar `.env`, `node_modules`, dan data nyata tidak pernah masuk commit.
-
-## Progress yang boleh dilaporkan kepada dosen
-
-- Draft SDD berbasis proposal selesai ditulis.
-- Struktur monorepo frontend/backend dibuat.
-- React UI demo dan Express health API telah diimplementasikan sebagai source code.
-- Setelah **kamu berhasil menjalankan lokal**, frontend dapat menampilkan status koneksi backend.
-- Database aplikasi, auth, modul WHO, dan fitur operasional **belum** diimplementasikan.
-
-Lihat `docs/BEGINNER_SETUP_GUIDE.md` untuk penjelasan lebih detail dan troubleshooting.
-
-Hasil audit dan uji aktual tersedia pada PROJECT_AUDIT.md, SETUP_VERIFICATION.md, dan NEXT_TASKS.md di root.
+Proyek ini dikembangkan untuk keperluan akademik dan demonstrasi operasional Posyandu Digital. Dilarang menyebarluaskan data pribadi riil pada repositori ini.
