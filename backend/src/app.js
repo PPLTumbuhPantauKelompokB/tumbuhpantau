@@ -1,31 +1,45 @@
 import express from 'express';
+import helmet from 'helmet';
 import { safeDemoOverview } from './demo-data.js';
+import { pingDatabase } from './config/db.js';
+import { requestId } from './middlewares/requestId.js';
+import { createSessionMiddleware } from './middlewares/auth.js';
+import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js';
+import { v1Router } from './routes/v1.js';
 
-export function createApp() {
+export function createApp({
+  checkDatabase = pingDatabase,
+  useMemorySession = checkDatabase !== pingDatabase
+} = {}) {
   const app = express();
-  app.disable('x-powered-by');
-  app.use(express.json({ limit: '32kb' }));
+  app.locals.checkDatabase = checkDatabase;
 
-  app.get('/api/health', (_req, res) => {
+  app.disable('x-powered-by');
+  app.use(helmet());
+  app.use(requestId);
+  app.use(express.json({ limit: '32kb' }));
+  app.use(createSessionMiddleware({ useMemoryStore: useMemorySession }));
+
+  app.get('/api/health', async (_req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.status(200).json({ status: 'ok', service: 'tumbuhpantau-api', version: '0.1.0', database: 'not-checked' });
+    const dbStatus = await checkDatabase();
+    res.status(200).json({
+      status: 'ok',
+      service: 'tumbuhpantau-api',
+      version: '0.1.0',
+      database: dbStatus.ok ? 'connected' : 'disconnected'
+    });
   });
 
-  // DEMO ONLY: data sintetis, tidak memerlukan autentikasi. Bukan endpoint data pasien.
   app.get('/api/demo/overview', (_req, res) => {
     res.set('Cache-Control', 'no-store');
     res.status(200).json(safeDemoOverview());
   });
 
-  app.use('/api', (_req, res) => {
-    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Endpoint API tidak tersedia.' } });
-  });
+  app.use('/api/v1', v1Router);
 
-  app.use((err, _req, res, _next) => {
-    // Jangan bocorkan error internal kepada pengguna maupun menganggapnya log aman.
-    if (process.env.NODE_ENV !== 'test') console.error('Unexpected API error:', err?.name || 'Error');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Terjadi kesalahan server.' } });
-  });
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }
