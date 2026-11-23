@@ -65,14 +65,17 @@ Selain merampungkan seluruh 40 tiket Jira (Sprint 1 & Sprint 2), antarmuka aplik
 4. **Tombol Pintas 1-Klik `Hadir & Ukur` + Pratinjau Z-Score Real-Time**:
    - Pada halaman **Detail Sesi (`/sesi/:id`)**, jika balita belum ditandai Hadir, tersedia tombol **`Hadir & Ukur`** yang otomatis mencatat kehadiran sekaligus membuka halaman input pengukuran dalam 1 klik.
    - Pada halaman **Input Pengukuran (`/pengukuran/:attendanceId`)**, grafik indikator Z-Score WHO terhitung otomatis secara *real-time* begitu kader mengetik angka Panjang/Tinggi Badan (`cm`).
-5. **Pengubah Mode Gelap (Dark Mode) & Mode Terang (Light Mode)**:
-   - Tersedia tombol **Gelap / Terang** (ikon Bulan/Matahari) di kanan atas **Landing Page (`/`)**, **Halaman Login (`/login`)**, dan **Topbar Dashboard**.
-   - Pilihan tema tersimpan otomatis di `localStorage` (`tp_theme_mode`).
-6. **Sentuhan Gradient PosCare, Animasi Transisi Halaman & Simulasi Landing Page**:
+5. **Pengaturan 4 Kombinasi Tema Visual (`Terang / Gelap` x `Solid / Glass`)**:
+   - Tersedia pasangan tombol **`Gelap / Terang`** dan **`Solid / Glass`** di kanan atas **Landing Page (`/`)**, **Halaman Login (`/login`)**, dan **Topbar Dashboard**.
+   - **4 Kombinasi Aktif**: `Terang + Solid`, `Terang + Glass`, `Gelap + Solid`, dan `Gelap + Glass` (tersimpan otomatis di `localStorage` pada kunci `tp_theme_mode` dan `tp_surface_style`).
+   - Saat mode **`Glass`** diaktifkan, komponen `InteractiveGlassEngine.jsx` otomatis menjalankan efek *Interactive Liquid Glass* secara halus: pantulan kaca lembut mengikuti kursor (*specular glare*), kemiringan 3D ringan (`0.9° - 1.35°`) pada kartu statistik/alur, bola cahaya *aurora* latar bergerak tenang (*slow ambient drift*), riak klik kaca lembut, serta sorotan *hover* menu sidebar hijau zamrud transparan.
+6. **Pencarian Langsung (Live Search) & Pengurutan Data pada 10 Halaman Daftar**:
+   - Seluruh halaman daftar data (`Data Balita`, `Data Orang Tua / Wali`, `Sesi Posyandu`, `Detail Sesi`, `Monitoring Ukur`, `Antrean Peninjauan`, `Tugas Tindak Lanjut`, `Laporan Agregat`, `Unit Organisasi`, `Akun Pengguna`, dan `Log Audit`) dilengkapi 1 baris bar filter terpadu (tanpa redundansi) berisi **kotak pencarian nama/kode secara langsung** dan **dropdown pengurutan (`Terbaru Diupload/Diinput`, `Terlama`, `Abjad Nama A - Z`, `Abjad Nama Z - A`, serta pengurutan prioritas seperti `Z-Score Terendah` dan `Tenggat Terdekat`)**.
+7. **Sentuhan Gradient PosCare, Animasi Transisi Halaman & Simulasi Landing Page Anonim**:
    - Menggunakan gradasi *PosCare Emerald Green (`#0E7C6B` -> `#10B981`) & Soft Teal (`#E8F5F1`)* pada baik Mode Terang maupun Mode Gelap (*Slate Night* `#0B131E` & `#131F2E`).
    - Dilengkapi *Top Progress Bar* hijau zamrud saat berpindah menu serta animasi *staggered cascade* pada kartu statistik dan baris tabel.
-   - Widget **Simulasi Presensi Posyandu** di Landing Page bersifat 100% anonim (tanpa mengekspos nama/data klinis balita ke publik) dan bertransformasi menjadi kartu **Rekapitulasi Otomatis 100%** saat mencapai `30 / 30`.
-7. **Perintah Pemulihan Tampilan UI (Rollback Instan)**:
+   - Widget **Simulasi Presensi Posyandu** di Landing Page bersifat 100% anonim (tanpa mengekspos nama/kode/data klinis balita ke publik) dengan tombol pintas `Tandai Semua (+N)` dan bertransformasi menjadi panel **Rekapitulasi Otomatis 100%** saat mencapai `30 / 30`.
+8. **Perintah Pemulihan Tampilan UI (Rollback Instan)**:
    - Kembali ke tampilan tepat sebelum eksperimen gradient (tetap dengan Pop-Up, Animasi & Dark Mode):
      ```bash
      npm run ui:restore-gradient

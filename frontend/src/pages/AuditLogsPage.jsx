@@ -10,6 +10,8 @@ export function AuditLogsPage() {
   const [entityTypeFilter, setEntityTypeFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -40,6 +42,8 @@ export function AuditLogsPage() {
     setEntityTypeFilter('');
     setStartDate('');
     setEndDate('');
+    setSearchQuery('');
+    setSortBy('newest');
   };
 
   return (
@@ -178,6 +182,37 @@ export function AuditLogsPage() {
               Reset Filter
             </button>
           </div>
+
+          <div className="col-sm-8 col-lg-8 mt-2">
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari nama pelaku, ringkasan perubahan, atau unit organisasi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari di log audit"
+              />
+            </div>
+          </div>
+
+          <div className="col-sm-4 col-lg-4 mt-2">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Log Audit"
+            >
+              <option value="newest">Urutkan: Kejadian Terbaru</option>
+              <option value="oldest">Urutkan: Kejadian Terlama</option>
+              <option value="actor_az">Urutkan: Abjad Pelaku (A - Z)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -204,7 +239,26 @@ export function AuditLogsPage() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((l) => (
+                {logs
+                  .filter((l) => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (l.actor_name || '').toLowerCase().includes(q) ||
+                      (l.actor_username || '').toLowerCase().includes(q) ||
+                      (l.organization_name || '').toLowerCase().includes(q) ||
+                      (l.change_summary || '').toLowerCase().includes(q) ||
+                      (l.action || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .sort((a, b) => {
+                    if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+                    if (sortBy === 'actor_az') {
+                      return (a.actor_name || '').localeCompare(b.actor_name || '', 'id');
+                    }
+                    return Number(b.id) - Number(a.id);
+                  })
+                  .map((l) => (
                   <tr key={l.id}>
                     <td className="font-mono-num small text-secondary">{l.occurred_at}</td>
                     <td>

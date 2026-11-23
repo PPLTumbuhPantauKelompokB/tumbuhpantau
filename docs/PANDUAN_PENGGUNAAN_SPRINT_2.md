@@ -13,8 +13,9 @@ Seluruh akun demo menggunakan kata sandi: **`123456`**.
 - **Bar Panduan "Alur Cepat (Langkah 1 -> 2 -> 3 -> 4)"**: Panduan tahapan kerja interaktif di bagian atas halaman yang dapat dibuka/ditutup dengan animasi akordeon mulus lewat tombol **Panduan Alur / Sembunyikan Alur**.
 - **Formulir Modal Fokus (Tanpa Bayangan Hitam)**: Form pendaftaran balita, tambah wali, buka/ubah sesi, koreksi identitas/pengukuran, dan buat tindak lanjut tampil sebagai jendela modal di tengah layar tanpa menggelapkan halaman di belakangnya.
 - **Tombol Pintas 1-Klik `Hadir & Ukur` & Kalkulasi Z-Score Otomatis**: Di halaman Detail Sesi tersedia tombol **`Hadir & Ukur`**, dan di halaman Input Pengukuran grafik Z-Score WHO terhitung otomatis begitu tinggi/panjang badan diketik.
-- **Mode Gelap (Dark Mode) & Mode Terang (Light Mode)**: Tombol **Gelap / Terang** tersedia di kanan atas Landing Page (`/`), Halaman Login (`/login`), dan Topbar Dashboard.
-- **Simulasi Presensi Anonim Interaktif di Landing Page**: Menampilkan progres pencatatan publik tanpa mengekspos nama/data klinis balita, lengkap dengan panel **Rekapitulasi Otomatis 100%** saat mencapai `30 / 30`.
+- **4 Kombinasi Tema Visual (`Terang / Gelap` x `Solid / Glass`)**: Tombol **`Gelap / Terang`** dan **`Solid / Glass`** tersedia di kanan atas Landing Page (`/`), Halaman Login (`/login`), dan Topbar Dashboard. Mode **`Glass`** dilengkapi *Interactive Liquid Glass* halus (kilau kaca mengikuti kursor, kemiringan 3D lembut, bola cahaya latar *aurora*, riak klik, dan sorotan *hover* menu sidebar hijau zamrud transparan).
+- **Pencarian Langsung & Pengurutan Data di Seluruh Halaman Daftar**: Kotak pencarian langsung (*live search*) dan pilihan urutan (**Terbaru Diupload**, **Abjad A-Z**, **Abjad Z-A**, **Terlama**, **Z-Score Terendah**, **Tenggat Terdekat**) tersedia rapi dalam 1 baris filter terpadu tanpa redundansi di 10 halaman daftar data.
+- **Simulasi Presensi Anonim Interaktif di Landing Page**: Menampilkan progres pencatatan publik tanpa mengekspos nama/data klinis balita, lengkap dengan tombol `Tandai Semua (+N)` dan panel **Rekapitulasi Otomatis 100%** saat mencapai `30 / 30`.
 
 | Peran | Username Demo | Unit Kerja | Menu Navigasi di Sidebar |
 | :--- | :--- | :--- | :--- |

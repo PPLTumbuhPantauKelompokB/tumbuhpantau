@@ -48,6 +48,13 @@ export function LoginPage() {
       return 'light';
     }
   });
+  const [surfaceStyle, setSurfaceStyle] = useState(() => {
+    try {
+      return localStorage.getItem('tp_surface_style') === 'glass' ? 'glass' : 'solid';
+    } catch {
+      return 'solid';
+    }
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -58,8 +65,20 @@ export function LoginPage() {
     } catch {}
   }, [themeMode]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-surface', surfaceStyle);
+    try {
+      localStorage.setItem('tp_surface_style', surfaceStyle);
+    } catch {}
+  }, [surfaceStyle]);
+
   const toggleThemeMode = () => {
     setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const toggleSurfaceStyle = () => {
+    setSurfaceStyle((prev) => (prev === 'glass' ? 'solid' : 'glass'));
   };
 
   const handleSubmit = async (e) => {
@@ -105,18 +124,38 @@ export function LoginPage() {
           </Link>
 
           <div className="d-flex align-items-center gap-2">
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary rounded-3 d-inline-flex align-items-center gap-1"
-              onClick={toggleThemeMode}
-              title={themeMode === 'dark' ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'}
-              aria-label={themeMode === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
-            >
-              <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={15} />
-              <span className="d-none d-sm-inline">
-                {themeMode === 'dark' ? 'Terang' : 'Gelap'}
-              </span>
-            </button>
+            <div className="btn-group btn-group-sm" role="group" aria-label="Pengaturan Tema Visual">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                onClick={toggleThemeMode}
+                title={themeMode === 'dark' ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'}
+                aria-label={themeMode === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
+              >
+                <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={15} />
+                <span className="d-none d-sm-inline">
+                  {themeMode === 'dark' ? 'Terang' : 'Gelap'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${
+                  surfaceStyle === 'glass' ? 'btn-tp-soft' : 'btn-outline-secondary'
+                } d-inline-flex align-items-center gap-1`}
+                onClick={toggleSurfaceStyle}
+                title={
+                  surfaceStyle === 'glass'
+                    ? 'Tema saat ini: Glass (Klik untuk beralih ke Solid)'
+                    : 'Tema saat ini: Solid (Klik untuk beralih ke Glass)'
+                }
+                aria-label="Ubah Tema Solid atau Glass"
+              >
+                <Icon name="layers" size={15} />
+                <span className="d-none d-sm-inline">
+                  {surfaceStyle === 'glass' ? 'Glass' : 'Solid'}
+                </span>
+              </button>
+            </div>
             <Link to="/" className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-3">
               <Icon name="arrow-left" size={14} />
               <span>Beranda</span>

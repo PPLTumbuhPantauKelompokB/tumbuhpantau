@@ -13,6 +13,10 @@ export function SessionsPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [feedback, setFeedback] = useState(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [sessionDate, setSessionDate] = useState('2026-11-20');
   const [sessionNotes, setSessionNotes] = useState('');
@@ -233,29 +237,111 @@ export function SessionsPage() {
 
       {errorMsg && <div className="alert alert-danger py-2 small rounded-3">{errorMsg}</div>}
 
+      <div className="tp-filter-bar">
+        <div className="row g-2 align-items-center">
+          <div className="col-md-5">
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari tanggal sesi, nama Posyandu, catatan, atau petugas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari sesi Posyandu"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter Status Sesi"
+            >
+              <option value="all">Semua Status Sesi</option>
+              <option value="open">Status: Terbuka</option>
+              <option value="closed">Status: Selesai</option>
+              <option value="cancelled">Status: Dibatalkan</option>
+            </select>
+          </div>
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Sesi"
+            >
+              <option value="newest">Urutkan: Tanggal Terbaru</option>
+              <option value="oldest">Urutkan: Tanggal Terlama</option>
+              <option value="az">Urutkan: Abjad Posyandu (A - Z)</option>
+              <option value="present_desc">Urutkan: Kehadiran Terbanyak</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">Memuat daftar sesi...</div>
-        ) : sessions.length === 0 ? (
-          <div className="text-center py-5 small text-secondary">
-            Belum ada sesi Posyandu yang tercatat.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table tp-table">
-              <thead>
-                <tr>
-                  <th>Tanggal Sesi</th>
-                  <th>Unit Posyandu</th>
-                  <th>Status Sesi</th>
-                  <th>Catatan / Keterangan</th>
-                  <th className="text-center">Kehadiran Balita</th>
-                  <th>Petugas Pembuka</th>
-                  <th className="text-end">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((s) => (
+        ) : (() => {
+            const filteredSessions = sessions
+              .filter((s) => {
+                if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+                if (!searchQuery.trim()) return true;
+                const q = searchQuery.toLowerCase();
+                return (
+                  (s.session_date || '').toLowerCase().includes(q) ||
+                  (s.posyandu_name || '').toLowerCase().includes(q) ||
+                  (s.posyandu_code || '').toLowerCase().includes(q) ||
+                  (s.notes || '').toLowerCase().includes(q) ||
+                  (s.created_by_name || '').toLowerCase().includes(q)
+                );
+              })
+              .sort((a, b) => {
+                if (sortBy === 'az') {
+                  return (a.posyandu_name || '').localeCompare(b.posyandu_name || '', 'id');
+                }
+                if (sortBy === 'oldest') {
+                  return (a.session_date || '').localeCompare(b.session_date || '');
+                }
+                if (sortBy === 'present_desc') {
+                  return Number(b.present_count || 0) - Number(a.present_count || 0);
+                }
+                return (b.session_date || '').localeCompare(a.session_date || '');
+              });
+
+            if (filteredSessions.length === 0) {
+              return (
+                <div className="text-center py-5 small text-secondary">
+                  Tidak ada sesi Posyandu yang sesuai dengan pencarian/filter.
+                </div>
+              );
+            }
+
+            return (
+              <div className="table-responsive">
+                <table className="table tp-table">
+                  <thead>
+                    <tr>
+                      <th>Tanggal Sesi</th>
+                      <th>Unit Posyandu</th>
+                      <th>Status Sesi</th>
+                      <th>Catatan / Keterangan</th>
+                      <th className="text-center">Kehadiran Balita</th>
+                      <th>Petugas Pembuka</th>
+                      <th className="text-end">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSessions.map((s) => (
                   <tr key={s.id}>
                     <td>
                       <div className="font-mono-num fw-bold text-dark">{s.session_date}</div>
@@ -334,7 +420,8 @@ export function SessionsPage() {
               </tbody>
             </table>
           </div>
-        )}
+            );
+          })()}
       </div>
     </div>
   );

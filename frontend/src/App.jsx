@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { AppShell } from './components/AppShell.jsx';
+import { InteractiveGlassEngine } from './components/InteractiveGlassEngine.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { LandingPage } from './pages/LandingPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
@@ -70,8 +71,10 @@ function ScrollToTop() {
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem('tp_theme_mode') === 'dark' ? 'dark' : 'light';
+      const savedSurface = localStorage.getItem('tp_surface_style') === 'glass' ? 'glass' : 'solid';
       document.documentElement.setAttribute('data-theme', savedTheme);
       document.documentElement.setAttribute('data-bs-theme', savedTheme);
+      document.documentElement.setAttribute('data-surface', savedSurface);
     } catch {}
   }, []);
 
@@ -89,6 +92,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
+        <InteractiveGlassEngine />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<PublicLoginRoute />} />

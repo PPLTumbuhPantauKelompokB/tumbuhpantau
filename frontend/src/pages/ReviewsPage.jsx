@@ -23,6 +23,8 @@ export function ReviewsPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -86,7 +88,30 @@ export function ReviewsPage() {
       .catch(() => {});
   }, [isPetugas]);
 
-  const selectedItem = items.find((i) => i.assessment_id === selectedId) || null;
+  const filteredItems = [...items]
+    .filter((item) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        (item.child_name || '').toLowerCase().includes(q) ||
+        (item.internal_code || '').toLowerCase().includes(q) ||
+        (item.posyandu_name || '').toLowerCase().includes(q) ||
+        (item.guardian_name || '').toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === 'az') return (a.child_name || '').localeCompare(b.child_name || '', 'id');
+      if (sortBy === 'za') return (b.child_name || '').localeCompare(a.child_name || '', 'id');
+      if (sortBy === 'oldest') return Number(a.measurement_id || 0) - Number(b.measurement_id || 0);
+      if (sortBy === 'z_asc') return Number(a.z_score || 0) - Number(b.z_score || 0);
+      return Number(b.measurement_id || 0) - Number(a.measurement_id || 0);
+    });
+
+  const selectedItem =
+    filteredItems.find((i) => i.assessment_id === selectedId) ||
+    filteredItems[0] ||
+    items.find((i) => i.assessment_id === selectedId) ||
+    null;
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -157,50 +182,91 @@ export function ReviewsPage() {
               : 'Pantau status verifikasi Puskesmas dan permintaan ukur ulang untuk Posyandu Anda.'}
           </p>
         </div>
+      </div>
 
-        <div className="d-flex flex-wrap gap-2">
+      <div className="tp-filter-bar">
+        <div className="row g-2 align-items-center">
+          <div className={isPetugas ? 'col-md-4' : 'col-md-5'}>
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari nama balita, kode internal, Posyandu, atau wali..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari kasus peninjauan"
+              />
+            </div>
+          </div>
+
           {isPetugas && (
-            <select
-              className="form-select form-select-sm rounded-3"
-              style={{ width: '205px', minHeight: '38px' }}
-              value={orgFilter}
-              onChange={(e) => setOrgFilter(e.target.value)}
-              aria-label="Filter Posyandu"
-            >
-              <option value="">Semua Posyandu Wilayah</option>
-              {organizations.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name} ({o.code})
-                </option>
-              ))}
-            </select>
+            <div className="col-md-2">
+              <select
+                className="form-select form-select-sm rounded-3"
+                style={{ minHeight: '38px' }}
+                value={orgFilter}
+                onChange={(e) => setOrgFilter(e.target.value)}
+                aria-label="Filter Posyandu"
+              >
+                <option value="">Semua Posyandu</option>
+                {organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
-          <select
-            className="form-select form-select-sm rounded-3"
-            style={{ width: '195px', minHeight: '38px' }}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            aria-label="Filter Status Peninjauan"
-          >
-            <option value="pending">Status: Perlu Tinjauan</option>
-            <option value="remeasure_requested">Status: Ukur Ulang</option>
-            <option value="validated">Status: Tervalidasi</option>
-            <option value="all">Semua Status Review</option>
-          </select>
+          <div className="col-md-2">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter Status Peninjauan"
+            >
+              <option value="pending">Perlu Tinjauan</option>
+              <option value="remeasure_requested">Ukur Ulang</option>
+              <option value="validated">Tervalidasi</option>
+              <option value="all">Semua Status</option>
+            </select>
+          </div>
 
-          <select
-            className="form-select form-select-sm rounded-3"
-            style={{ width: '185px', minHeight: '38px' }}
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            aria-label="Filter Kategori"
-          >
-            <option value="">Semua Kategori WHO</option>
-            <option value="sangat_pendek">Sangat Pendek (&lt;-3 SD)</option>
-            <option value="pendek">Pendek (-3 s.d. &lt;-2 SD)</option>
-            <option value="tinggi">Tinggi (&gt;+3 SD)</option>
-          </select>
+          <div className="col-md-2">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="Filter Kategori"
+            >
+              <option value="">Semua Kategori</option>
+              <option value="sangat_pendek">Sangat Pendek</option>
+              <option value="pendek">Pendek</option>
+              <option value="tinggi">Tinggi</option>
+            </select>
+          </div>
+
+          <div className={isPetugas ? 'col-md-2' : 'col-md-3'}>
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Antrean"
+            >
+              <option value="newest">Urut: Terbaru Diukur</option>
+              <option value="az">Urut: Abjad Nama (A - Z)</option>
+              <option value="za">Urut: Abjad Nama (Z - A)</option>
+              <option value="z_asc">Urut: Z-Score Terendah</option>
+              <option value="oldest">Urut: Terlama Diukur</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -210,21 +276,21 @@ export function ReviewsPage() {
         <div className="tp-card text-center py-5 small text-secondary">
           Memuat antrean peninjauan...
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div className="tp-card text-center py-5 small text-secondary">
-          Tidak ada hasil pengukuran pada filter status ini.
+          Tidak ada hasil pengukuran yang sesuai dengan pencarian/filter.
         </div>
       ) : (
         <div className="row g-4">
           <div className="col-lg-5">
             <div className="small fw-semibold text-secondary mb-2">
-              Daftar Antrean Kasus ({items.length} hasil ukur)
+              Daftar Antrean Kasus ({filteredItems.length} hasil ukur)
             </div>
             <div style={{ maxHeight: '640px', overflowY: 'auto' }} className="pe-1">
-              {items.map((item) => {
+              {filteredItems.map((item) => {
                 const catInfo = formatCategoryInfo(item.category);
                 const revInfo = formatReviewStatusInfo(item.review_status);
-                const isSelected = item.assessment_id === selectedId;
+                const isSelected = item.assessment_id === selectedItem?.assessment_id;
                 const avatarTone = getAvatarToneClass(item.internal_code || item.child_name);
 
                 return (

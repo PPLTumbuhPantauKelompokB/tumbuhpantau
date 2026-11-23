@@ -22,6 +22,8 @@ export function SessionDetailPage() {
   const [savingAttendance, setSavingAttendance] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [attFilter, setAttFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('az');
 
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [editDate, setEditDate] = useState('');
@@ -185,15 +187,39 @@ export function SessionDetailPage() {
   const isKader = user?.role === 'kader';
   const isOpen = session.status === 'open';
 
-  const filteredChildren = children.filter((c) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.child_name.toLowerCase().includes(q) ||
-      c.internal_code.toLowerCase().includes(q) ||
-      (c.guardian_name && c.guardian_name.toLowerCase().includes(q))
-    );
-  });
+  const filteredChildren = children
+    .filter((c) => {
+      if (attFilter === 'present' && c.attendance_status !== 'present') return false;
+      if (attFilter === 'absent' && c.attendance_status !== 'absent') return false;
+      if (attFilter === 'unrecorded' && c.attendance_status) return false;
+      if (attFilter === 'measured' && c.measurement?.status !== 'submitted') return false;
+      if (
+        attFilter === 'unmeasured' &&
+        (c.attendance_status !== 'present' || c.measurement?.status === 'submitted')
+      ) {
+        return false;
+      }
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        c.child_name.toLowerCase().includes(q) ||
+        c.internal_code.toLowerCase().includes(q) ||
+        (c.guardian_name && c.guardian_name.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === 'za') return (b.child_name || '').localeCompare(a.child_name || '', 'id');
+      if (sortBy === 'newest') {
+        const aId = Number(a.measurement?.id || a.attendance_id || a.child_id || 0);
+        const bId = Number(b.measurement?.id || b.attendance_id || b.child_id || 0);
+        return bId - aId;
+      }
+      if (sortBy === 'age_asc') {
+        return Number(a.age_days_at_session || 0) - Number(b.age_days_at_session || 0);
+      }
+      return (a.child_name || '').localeCompare(b.child_name || '', 'id');
+    });
 
   const presentCount = children.filter((c) => c.attendance_status === 'present').length;
   const absentCount = children.filter((c) => c.attendance_status === 'absent').length;
@@ -403,7 +429,7 @@ export function SessionDetailPage() {
 
       <div className="tp-filter-bar">
         <div className="row g-2 align-items-center">
-          <div className="col-md-6">
+          <div className="col-md-5">
             <div className="tp-input-icon-group">
               <span className="tp-input-icon-left">
                 <Icon name="search" size={16} />
@@ -412,15 +438,44 @@ export function SessionDetailPage() {
                 type="search"
                 className="form-control form-control-sm tp-input-with-icon"
                 style={{ minHeight: '38px' }}
-                placeholder="Cari balita di sesi ini berdasarkan nama, kode, atau wali"
+                placeholder="Cari nama balita, kode internal, atau nama wali..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Cari balita di sesi"
               />
             </div>
           </div>
-          <div className="col-md-6 text-md-end small text-secondary">
-            Menampilkan <strong>{filteredChildren.length}</strong> dari <strong>{children.length}</strong> sasaran balita
+
+          <div className="col-md-3">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={attFilter}
+              onChange={(e) => setAttFilter(e.target.value)}
+              aria-label="Filter Status Kehadiran"
+            >
+              <option value="all">Semua Sasaran ({children.length})</option>
+              <option value="present">Status: Hadir ({presentCount})</option>
+              <option value="absent">Status: Tidak Hadir ({absentCount})</option>
+              <option value="unrecorded">Status: Belum Dicatat ({unrecordedCount})</option>
+              <option value="measured">Sudah Diukur Lengkap</option>
+              <option value="unmeasured">Hadir Belum Diukur / Draf</option>
+            </select>
+          </div>
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Balita di Sesi"
+            >
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="newest">Urutkan: Terbaru Diinput / Diukur</option>
+              <option value="age_asc">Urutkan: Usia Termuda</option>
+            </select>
           </div>
         </div>
       </div>

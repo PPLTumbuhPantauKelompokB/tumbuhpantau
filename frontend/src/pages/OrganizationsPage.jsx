@@ -12,6 +12,9 @@ export function OrganizationsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [feedback, setFeedback] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('az');
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formState, setFormState] = useState({
@@ -221,6 +224,57 @@ export function OrganizationsPage() {
 
       {errorMsg && <div className="alert alert-danger py-2 small">{errorMsg}</div>}
 
+      <div className="tp-filter-bar">
+        <div className="row g-2 align-items-center">
+          <div className="col-md-5">
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari nama unit organisasi, kode, atau induk pembina..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari unit organisasi"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              aria-label="Filter Tingkat Organisasi"
+            >
+              <option value="all">Semua Tingkat Unit</option>
+              <option value="posyandu">Tingkat: Posyandu</option>
+              <option value="puskesmas">Tingkat: Puskesmas</option>
+              <option value="dinas_kesehatan">Tingkat: Dinas Kesehatan</option>
+            </select>
+          </div>
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Organisasi"
+            >
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="newest">Urutkan: Terbaru Ditambahkan</option>
+              <option value="children_desc">Urutkan: Balita Sasaran Terbanyak</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">Memuat data organisasi...</div>
@@ -240,7 +294,26 @@ export function OrganizationsPage() {
                 </tr>
               </thead>
               <tbody>
-                {orgs.map((org) => (
+                {orgs
+                  .filter((org) => {
+                    if (typeFilter !== 'all' && org.type !== typeFilter) return false;
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (org.name || '').toLowerCase().includes(q) ||
+                      (org.code || '').toLowerCase().includes(q) ||
+                      (org.parent_name || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .sort((a, b) => {
+                    if (sortBy === 'za') return (b.name || '').localeCompare(a.name || '', 'id');
+                    if (sortBy === 'newest') return Number(b.id) - Number(a.id);
+                    if (sortBy === 'children_desc') {
+                      return Number(b.active_children_count || 0) - Number(a.active_children_count || 0);
+                    }
+                    return (a.name || '').localeCompare(b.name || '', 'id');
+                  })
+                  .map((org) => (
                   <tr key={org.id}>
                     <td>
                       <span className="font-mono-num fw-bold text-dark">{org.code}</span>

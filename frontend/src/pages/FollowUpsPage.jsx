@@ -17,6 +17,8 @@ export function FollowUpsPage() {
 
   const [tasks, setTasks] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
   const [childrenList, setChildrenList] = useState([]);
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,29 +109,14 @@ export function FollowUpsPage() {
           </p>
         </div>
 
-        <div className="d-flex flex-wrap gap-2">
-          <select
-            className="form-select form-select-sm rounded-3"
-            style={{ width: '175px', minHeight: '38px' }}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            aria-label="Filter Status Tindak Lanjut"
-          >
-            <option value="all">Semua Status</option>
-            <option value="open">Status: Terbuka</option>
-            <option value="in_progress">Status: Sedang Berjalan</option>
-            <option value="closed">Status: Selesai</option>
-          </select>
-
-          <button
-            type="button"
-            className="btn btn-tp-primary"
-            onClick={() => setShowCreateForm(true)}
-          >
-            <Icon name="plus" size={17} />
-            <span>Buat Tugas Baru</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-tp-primary"
+          onClick={() => setShowCreateForm(true)}
+        >
+          <Icon name="plus" size={17} />
+          <span>Buat Tugas Baru</span>
+        </button>
       </div>
 
       {showCreateForm && (
@@ -255,30 +242,107 @@ export function FollowUpsPage() {
 
       {errorMsg && <div className="alert alert-danger py-2 small rounded-3">{errorMsg}</div>}
 
+      <div className="tp-filter-bar">
+        <div className="row g-2 align-items-center">
+          <div className="col-md-5">
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari nama balita, kode internal, Posyandu, atau penanggung jawab..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari tugas tindak lanjut"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter Status Tindak Lanjut"
+            >
+              <option value="all">Semua Status Tugas</option>
+              <option value="open">Status: Terbuka</option>
+              <option value="in_progress">Status: Sedang Berjalan</option>
+              <option value="closed">Status: Selesai</option>
+            </select>
+          </div>
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Tugas Tindak Lanjut"
+            >
+              <option value="newest">Urutkan: Terbaru Dibuat</option>
+              <option value="az">Urutkan: Abjad Nama Balita (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama Balita (Z - A)</option>
+              <option value="due_asc">Urutkan: Tenggat Terdekat</option>
+              <option value="oldest">Urutkan: Terlama Dibuat</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">
             Memuat daftar tugas tindak lanjut...
           </div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-5 small text-secondary">
-            Tidak ada tugas tindak lanjut pada filter ini.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table tp-table">
-              <thead>
-                <tr>
-                  <th>Balita & Posyandu</th>
-                  <th>Kategori & Deskripsi Intervensi</th>
-                  <th>Indikator Pemicu</th>
-                  <th>Penanggung Jawab</th>
-                  <th>Tenggat & Status</th>
-                  <th className="text-end">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((t) => {
+        ) : (() => {
+            const filteredTasks = [...tasks]
+              .filter((t) => {
+                if (!searchQuery.trim()) return true;
+                const q = searchQuery.toLowerCase();
+                return (
+                  (t.child_name || '').toLowerCase().includes(q) ||
+                  (t.internal_code || '').toLowerCase().includes(q) ||
+                  (t.posyandu_name || '').toLowerCase().includes(q) ||
+                  (t.description || '').toLowerCase().includes(q) ||
+                  (t.assigned_to_name || '').toLowerCase().includes(q)
+                );
+              })
+              .sort((a, b) => {
+                if (sortBy === 'az') return (a.child_name || '').localeCompare(b.child_name || '', 'id');
+                if (sortBy === 'za') return (b.child_name || '').localeCompare(a.child_name || '', 'id');
+                if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+                if (sortBy === 'due_asc') return (a.due_date || '').localeCompare(b.due_date || '');
+                return Number(b.id) - Number(a.id);
+              });
+
+            if (filteredTasks.length === 0) {
+              return (
+                <div className="text-center py-5 small text-secondary">
+                  Tidak ada tugas tindak lanjut yang sesuai dengan pencarian/filter.
+                </div>
+              );
+            }
+
+            return (
+              <div className="table-responsive">
+                <table className="table tp-table">
+                  <thead>
+                    <tr>
+                      <th>Balita & Posyandu</th>
+                      <th>Kategori & Deskripsi Intervensi</th>
+                      <th>Indikator Pemicu</th>
+                      <th>Penanggung Jawab</th>
+                      <th>Tenggat & Status</th>
+                      <th className="text-end">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTasks.map((t) => {
                   const stInfo = formatFollowUpStatusInfo(t.status, t.is_overdue);
                   const catInfo = formatCategoryInfo(t.category);
                   const avatarTone = getAvatarToneClass(t.internal_code || t.child_name);
@@ -332,11 +396,12 @@ export function FollowUpsPage() {
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
       </div>
     </div>
   );

@@ -11,6 +11,8 @@ export function MonitoringPage() {
   const [period, setPeriod] = useState('2026-11');
   const [orgFilter, setOrgFilter] = useState('');
   const [sessionFilter, setSessionFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('az');
   const [organizations, setOrganizations] = useState([]);
   const [sessionsList, setSessionsList] = useState([]);
   const [activeTab, setActiveTab] = useState('present_incomplete');
@@ -60,6 +62,28 @@ export function MonitoringPage() {
     if (orgFilter && String(s.organization_id) !== String(orgFilter)) return false;
     return true;
   });
+
+  const filterAndSortItems = (list = []) => {
+    const q = searchQuery.trim().toLowerCase();
+    return [...list]
+      .filter((item) => {
+        if (!q) return true;
+        return (
+          (item.child_name || '').toLowerCase().includes(q) ||
+          (item.internal_code || '').toLowerCase().includes(q) ||
+          (item.guardian_name || '').toLowerCase().includes(q) ||
+          (item.posyandu_name || '').toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (sortBy === 'za') return (b.child_name || '').localeCompare(a.child_name || '', 'id');
+        if (sortBy === 'newest') return Number(b.child_id || 0) - Number(a.child_id || 0);
+        if (sortBy === 'posyandu_az') {
+          return (a.posyandu_name || '').localeCompare(b.posyandu_name || '', 'id');
+        }
+        return (a.child_name || '').localeCompare(b.child_name || '', 'id');
+      });
+  };
 
   return (
     <div className="d-flex flex-column gap-4">
@@ -214,7 +238,7 @@ export function MonitoringPage() {
             </div>
           </div>
 
-          <div>
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div className="tp-segmented-tabs" role="tablist" aria-label="Filter Kelengkapan">
               <button
                 type="button"
@@ -242,11 +266,46 @@ export function MonitoringPage() {
             </div>
           </div>
 
+          <div className="tp-filter-bar">
+            <div className="row g-2 align-items-center">
+              <div className="col-md-7">
+                <div className="tp-input-icon-group">
+                  <span className="tp-input-icon-left">
+                    <Icon name="search" size={16} />
+                  </span>
+                  <input
+                    type="search"
+                    className="form-control form-control-sm tp-input-with-icon"
+                    style={{ minHeight: '38px' }}
+                    placeholder="Cari nama balita, kode internal, nama wali, atau Posyandu..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Cari balita di monitoring"
+                  />
+                </div>
+              </div>
+              <div className="col-md-5">
+                <select
+                  className="form-select form-select-sm rounded-3"
+                  style={{ minHeight: '38px' }}
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  aria-label="Urutkan Monitoring"
+                >
+                  <option value="az">Urutkan: Abjad Nama Balita (A - Z)</option>
+                  <option value="za">Urutkan: Abjad Nama Balita (Z - A)</option>
+                  <option value="newest">Urutkan: Terbaru Didaftarkan</option>
+                  <option value="posyandu_az">Urutkan: Unit Posyandu (A - Z)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div className="tp-card p-0 overflow-hidden">
             {activeTab === 'present_incomplete' ? (
-              data.presentIncomplete.length === 0 ? (
+              filterAndSortItems(data.presentIncomplete).length === 0 ? (
                 <div className="text-center py-5 small text-secondary">
-                  Tidak ada balita yang tertahan pada status draf di sesi/periode ini.
+                  Tidak ada balita yang tertahan pada status draf sesuai pencarian/filter.
                 </div>
               ) : (
                 <div className="table-responsive">
@@ -262,7 +321,7 @@ export function MonitoringPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.presentIncomplete.map((item) => {
+                      {filterAndSortItems(data.presentIncomplete).map((item) => {
                         const avatarTone = getAvatarToneClass(
                           item.internal_code || item.child_name
                         );
@@ -310,9 +369,9 @@ export function MonitoringPage() {
                   </table>
                 </div>
               )
-            ) : data.unmeasuredChildren.length === 0 ? (
+            ) : filterAndSortItems(data.unmeasuredChildren).length === 0 ? (
               <div className="text-center py-5 small text-secondary">
-                Seluruh balita aktif telah tercatat hadir dan diukur di sesi/periode ini.
+                Tidak ada balita belum diukur yang sesuai pencarian/filter.
               </div>
             ) : (
               <div className="table-responsive">
@@ -327,7 +386,7 @@ export function MonitoringPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.unmeasuredChildren.map((item) => {
+                    {filterAndSortItems(data.unmeasuredChildren).map((item) => {
                       const avatarTone = getAvatarToneClass(
                         item.internal_code || item.child_name
                       );

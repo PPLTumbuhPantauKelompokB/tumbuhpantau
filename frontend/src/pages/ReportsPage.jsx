@@ -7,6 +7,8 @@ export function ReportsPage() {
   const { user } = useAuth();
   const [period, setPeriod] = useState('2026-11');
   const [posyanduId, setPosyanduId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('az');
   const [organizations, setOrganizations] = useState([]);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +126,42 @@ export function ReportsPage() {
 
       {errorMsg && <div className="alert alert-danger py-2 small rounded-3">{errorMsg}</div>}
 
+      <div className="tp-filter-bar">
+        <div className="row g-2 align-items-center">
+          <div className="col-md-7">
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari nama Posyandu atau kode organisasi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari unit di laporan"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-5">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Laporan"
+            >
+              <option value="az">Urutkan: Abjad Nama Posyandu (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama Posyandu (Z - A)</option>
+              <option value="active_desc">Urutkan: Balita Aktif Terbanyak</option>
+              <option value="measured_desc">Urutkan: Terukur Lengkap Terbanyak</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {report?.isMaskedForDinas && (
         <div className="alert alert-info py-2 px-3 small mb-0 rounded-3 d-flex align-items-center gap-2">
           <Icon name="check-shield" size={17} />
@@ -154,7 +192,28 @@ export function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {report.rows.map((r) => {
+                {report.rows
+                  .filter((r) => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (r.nama_organisasi || '').toLowerCase().includes(q) ||
+                      (r.kode_organisasi || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .sort((a, b) => {
+                    if (sortBy === 'za') {
+                      return (b.nama_organisasi || '').localeCompare(a.nama_organisasi || '', 'id');
+                    }
+                    if (sortBy === 'active_desc') {
+                      return Number(b.total_anak_aktif || 0) - Number(a.total_anak_aktif || 0);
+                    }
+                    if (sortBy === 'measured_desc') {
+                      return Number(b.jumlah_diukur_lengkap || 0) - Number(a.jumlah_diukur_lengkap || 0);
+                    }
+                    return (a.nama_organisasi || '').localeCompare(b.nama_organisasi || '', 'id');
+                  })
+                  .map((r) => {
                   const totalActive = Number(r.total_anak_aktif) || 0;
                   const measured = Number(r.jumlah_diukur_lengkap) || 0;
                   const pct = totalActive > 0 ? Math.round((measured / totalActive) * 100) : 0;

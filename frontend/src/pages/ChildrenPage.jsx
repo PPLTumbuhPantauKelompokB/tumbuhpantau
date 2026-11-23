@@ -19,6 +19,7 @@ export function ChildrenPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [orgFilter, setOrgFilter] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formState, setFormState] = useState({
@@ -132,6 +133,15 @@ export function ChildrenPage() {
       });
     }
   };
+
+  const sortedChildren = [...children].sort((a, b) => {
+    if (sortBy === 'az') return (a.name || '').localeCompare(b.name || '', 'id');
+    if (sortBy === 'za') return (b.name || '').localeCompare(a.name || '', 'id');
+    if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+    if (sortBy === 'age_asc') return Number(a.age_days_current || 0) - Number(b.age_days_current || 0);
+    if (sortBy === 'age_desc') return Number(b.age_days_current || 0) - Number(a.age_days_current || 0);
+    return Number(b.id) - Number(a.id);
+  });
 
   return (
     <div className="d-flex flex-column gap-4">
@@ -357,7 +367,7 @@ export function ChildrenPage() {
 
       <div className="tp-filter-bar">
         <div className="row g-2 align-items-center">
-          <div className="col-md-5">
+          <div className={user?.role !== 'kader' ? 'col-md-4' : 'col-md-5'}>
             <div className="tp-input-icon-group">
               <span className="tp-input-icon-left">
                 <Icon name="search" size={16} />
@@ -366,7 +376,7 @@ export function ChildrenPage() {
                 type="search"
                 className="form-control form-control-sm tp-input-with-icon"
                 style={{ minHeight: '38px' }}
-                placeholder="Cari nama balita, kode internal, atau nama wali"
+                placeholder="Cari nama balita, kode internal, atau nama wali..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Cari balita"
@@ -375,7 +385,7 @@ export function ChildrenPage() {
           </div>
 
           {user?.role !== 'kader' && (
-            <div className="col-md-4">
+            <div className="col-md-3">
               <select
                 className="form-select form-select-sm rounded-3"
                 style={{ minHeight: '38px' }}
@@ -393,7 +403,7 @@ export function ChildrenPage() {
             </div>
           )}
 
-          <div className="col-md-3">
+          <div className={user?.role !== 'kader' ? 'col-md-2' : 'col-md-3'}>
             <select
               className="form-select form-select-sm rounded-3"
               style={{ minHeight: '38px' }}
@@ -406,6 +416,23 @@ export function ChildrenPage() {
               <option value="all">Semua Status</option>
             </select>
           </div>
+
+          <div className={user?.role !== 'kader' ? 'col-md-3' : 'col-md-4'}>
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Data Balita"
+            >
+              <option value="newest">Urutkan: Terbaru Diupload</option>
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="oldest">Urutkan: Terlama Diupload</option>
+              <option value="age_asc">Urutkan: Usia Termuda</option>
+              <option value="age_desc">Urutkan: Usia Tertua</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -414,9 +441,9 @@ export function ChildrenPage() {
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">Memuat daftar balita...</div>
-        ) : children.length === 0 ? (
+        ) : sortedChildren.length === 0 ? (
           <div className="text-center py-5 small text-secondary">
-            Tidak ditemukan data balita yang sesuai dengan filter.
+            Tidak ditemukan data balita yang sesuai dengan pencarian/filter.
           </div>
         ) : (
           <div className="table-responsive">
@@ -433,7 +460,7 @@ export function ChildrenPage() {
                 </tr>
               </thead>
               <tbody>
-                {children.map((c) => {
+                {sortedChildren.map((c) => {
                   const avatarTone = getAvatarToneClass(c.internal_code || c.name);
                   const lm = c.latest_measurement;
                   const catInfo = formatCategoryInfo(lm?.category);

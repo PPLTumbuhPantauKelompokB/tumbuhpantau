@@ -66,5 +66,6 @@
    - Bar panduan **Alur Cepat (Langkah 1 -> 2 -> 3 -> 4)** dengan animasi akordeon mulus (`frontend/src/components/AppShell.jsx`).
    - Formulir tambah & edit berbasis modal fokus tanpa bayangan hitam (*no dark backdrop*).
    - Tombol pintas 1-klik **`Hadir & Ukur`** pada detail sesi dan pratinjau Z-Score WHO otomatis secara *real-time*.
-   - Pengubah **Mode Gelap (Dark Mode) & Mode Terang (Light Mode)** di Landing Page, Login Page, dan Topbar Dashboard.
+   - Pengubah **4 Kombinasi Tema Visual (`Terang / Gelap` x `Solid / Glass`)** di Landing Page, Login Page, dan Topbar Dashboard disertai engine **Interactive Liquid Glass** lembut (`frontend/src/components/InteractiveGlassEngine.jsx`) dan sorotan *hover* menu sidebar hijau zamrud transparan.
+   - **Pencarian Langsung (Live Search) & Pengurutan Data (`Terbaru`, `Abjad A-Z/Z-A`, `Terlama`)** dalam 1 baris bar filter terpadu (tanpa redundansi) pada 10 halaman daftar data.
    - Estetika **Gradient PosCare (Emerald Green & Soft Teal)**, animasi transisi halaman *staggered cascade*, widget simulasi presensi anonim interaktif di Landing Page, serta skrip *rollback* tampilan (`npm run ui:restore-gradient` dan `npm run ui:restore`).

@@ -47,6 +47,10 @@ Aplikasi web responsif untuk pencatatan operasional, kalkulasi antropometri WHO 
    - `TEST-01`: Unit test validasi 160 kombinasi Z-Score WHO dengan deviasi absolut `<= 0.01` (`backend/tests/growthCalculator.test.js`).
    - `TEST-02`: Integration test isolasi keamanan RBAC & lintas organisasi (`401`/`403` + verifikasi `ACCESS_DENIED` di `audit_logs`) serta alur E2E Sprint 2 (`backend/tests/sprint2-integration.test.js`).
    - `TEST-03`: Skrip load testing k6 20 Virtual Users (`scripts/k6/sprint2-load-test.js`, `scripts/k6/run-local-load-verification.js`) dan laporan hasil uji beban (`docs/LOAD_TEST_REPORT.md`, `p95 = 190,11 ms`).
+7. **Peningkatan UI/UX, Tema Visual & Pencarian Data**:
+   - **4 Kombinasi Tema Visual (`Terang / Gelap` x `Solid / Glass`)** tersedia di Landing Page, Login Page, dan Topbar Dashboard lengkap dengan engine **Interactive Liquid Glass** (`InteractiveGlassEngine.jsx`) yang halus dan nyaman di mata.
+   - **Pop-Up Konfirmasi Otomatis saat Simpan & Edit** disertai tombol langkah selanjutnya, **Bar Panduan Alur Cepat (1 -> 2 -> 3 -> 4)** dengan animasi akordeon mulus, formulir modal fokus tanpa bayangan gelap, serta tombol pintas 1-klik **`Hadir & Ukur`**.
+   - **Pencarian Langsung (Live Search) & Pengurutan (`Terbaru Diupload`, `Abjad A-Z/Z-A`, `Terlama`)** pada 10 halaman daftar data dalam 1 baris filter terpadu tanpa redundansi.
 
 ---
 
