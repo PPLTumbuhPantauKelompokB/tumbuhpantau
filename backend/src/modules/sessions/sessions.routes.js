@@ -6,6 +6,7 @@ import { sendSuccess } from '../../lib/respond.js';
 import { requireAuth, requireRoles, verifyCsrf } from '../../middlewares/auth.js';
 import { AccessPolicy, ROLES } from '../../policies/AccessPolicy.js';
 import { recordAuditLog } from '../../services/auditService.js';
+import { calculateAgeDays, getRecommendedPosition } from '../../services/growthCalculator.js';
 
 export const sessionsRouter = Router();
 
@@ -23,13 +24,6 @@ function formatDateOnly(val) {
     return `${y}-${m}-${d}`;
   }
   return String(val).slice(0, 10);
-}
-
-function calculateAgeDays(birthDateStr, referenceDateStr) {
-  const b = new Date(`${birthDateStr}T00:00:00Z`);
-  const r = new Date(`${referenceDateStr}T00:00:00Z`);
-  const diffTime = r.getTime() - b.getTime();
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
 sessionsRouter.get('/', async (req, res, next) => {
@@ -75,7 +69,19 @@ sessionsRouter.get('/', async (req, res, next) => {
         s.cancel_reason,
         (SELECT COUNT(*) FROM children c WHERE c.organization_id = s.organization_id AND c.inactive_on IS NULL) AS active_children_count,
         (SELECT COUNT(*) FROM attendances a WHERE a.session_id = s.id AND a.status = 'present') AS present_count,
-        (SELECT COUNT(*) FROM attendances a WHERE a.session_id = s.id AND a.status = 'absent') AS absent_count
+        (SELECT COUNT(*) FROM attendances a WHERE a.session_id = s.id AND a.status = 'absent') AS absent_count,
+        (
+          SELECT COUNT(DISTINCT a.id)
+          FROM attendances a
+          INNER JOIN measurements m ON m.attendance_id = a.id
+          WHERE a.session_id = s.id AND m.status = 'submitted'
+        ) AS measured_submitted_count,
+        (
+          SELECT COUNT(DISTINCT a.id)
+          FROM attendances a
+          INNER JOIN measurements m ON m.attendance_id = a.id
+          WHERE a.session_id = s.id AND m.status = 'draft'
+        ) AS measured_draft_count
       FROM posyandu_sessions s
       INNER JOIN organizations o ON o.id = s.organization_id
       INNER JOIN users u ON u.id = s.created_by
@@ -102,8 +108,8 @@ sessionsRouter.get('/', async (req, res, next) => {
       active_children_count: Number(r.active_children_count) || 0,
       present_count: Number(r.present_count) || 0,
       absent_count: Number(r.absent_count) || 0,
-      measured_submitted_count: 0,
-      measured_draft_count: 0
+      measured_submitted_count: Number(r.measured_submitted_count) || 0,
+      measured_draft_count: Number(r.measured_draft_count) || 0
     }));
 
     return sendSuccess(res, result);
@@ -224,10 +230,37 @@ sessionsRouter.get('/:id', async (req, res, next) => {
         g.phone AS guardian_phone,
         a.id AS attendance_id,
         a.status AS attendance_status,
-        a.recorded_at
+        a.recorded_by,
+        ru.name AS recorded_by_name,
+        a.recorded_at,
+        m.id AS measurement_id,
+        m.status AS measurement_status,
+        m.revision_no,
+        m.weight_kg,
+        m.length_height_cm,
+        m.position,
+        m.measured_at,
+        ga.id AS assessment_id,
+        ga.age_days,
+        ga.adjustment_cm,
+        ga.adjusted_length_height_cm,
+        ga.z_score,
+        ga.category,
+        ga.quality_status,
+        ga.review_status
        FROM children c
        LEFT JOIN guardians g ON g.id = c.guardian_id
        LEFT JOIN attendances a ON a.session_id = ? AND a.child_id = c.id
+       LEFT JOIN users ru ON ru.id = a.recorded_by
+       LEFT JOIN measurements m ON m.attendance_id = a.id AND m.status IN ('submitted', 'draft')
+         AND m.id = (
+           SELECT m2.id
+           FROM measurements m2
+           WHERE m2.attendance_id = a.id AND m2.status IN ('submitted', 'draft')
+           ORDER BY FIELD(m2.status, 'submitted', 'draft'), m2.revision_no DESC, m2.id DESC
+           LIMIT 1
+         )
+       LEFT JOIN growth_assessments ga ON ga.measurement_id = m.id
        WHERE c.organization_id = ?
          AND (c.inactive_on IS NULL OR a.id IS NOT NULL)
        ORDER BY c.name ASC`,
@@ -240,7 +273,7 @@ sessionsRouter.get('/:id', async (req, res, next) => {
       const birthDateStr = formatDateOnly(r.birth_date);
       const ageDaysAtSession = Math.max(0, calculateAgeDays(birthDateStr, sessionDateStr));
       const ageMonthsAtSession = Number((ageDaysAtSession / 30.4375).toFixed(1));
-      const recommendedPos = ageDaysAtSession < 730 ? 'recumbent' : 'standing';
+      const recommendedPos = getRecommendedPosition(ageDaysAtSession);
 
       return {
         child_id: Number(r.child_id),
@@ -256,8 +289,33 @@ sessionsRouter.get('/:id', async (req, res, next) => {
         recommended_position: recommendedPos,
         attendance_id: r.attendance_id ? Number(r.attendance_id) : null,
         attendance_status: r.attendance_status || null,
+        attendance_recorded_by: r.recorded_by ? Number(r.recorded_by) : null,
+        attendance_recorded_by_name: r.recorded_by_name || null,
         attendance_recorded_at: r.recorded_at || null,
-        measurement: null
+        recorded_at: r.recorded_at || null,
+        measurement: r.measurement_id
+          ? {
+              id: Number(r.measurement_id),
+              status: r.measurement_status,
+              revision_no: Number(r.revision_no),
+              weight_kg: r.weight_kg !== null ? Number(r.weight_kg) : null,
+              length_height_cm: r.length_height_cm !== null ? Number(r.length_height_cm) : null,
+              position: r.position,
+              measured_at: r.measured_at,
+              assessment: r.assessment_id
+                ? {
+                    id: Number(r.assessment_id),
+                    age_days: Number(r.age_days),
+                    adjustment_cm: Number(r.adjustment_cm),
+                    adjusted_length_height_cm: Number(r.adjusted_length_height_cm),
+                    z_score: Number(r.z_score),
+                    category: r.category,
+                    quality_status: r.quality_status,
+                    review_status: r.review_status
+                  }
+                : null
+            }
+          : null
       };
     });
 
@@ -517,6 +575,108 @@ sessionsRouter.post(
         session_id: sessionId,
         updated_count: savedAttendances.length,
         attendances: savedAttendances
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const updateAttendanceStatusSchema = z.object({
+  status: z.enum(['present', 'absent'], {
+    errorMap: () => ({ message: 'Status kehadiran harus present atau absent.' })
+  })
+});
+
+sessionsRouter.patch(
+  '/:sessionId/attendances/:id',
+  verifyCsrf,
+  requireRoles(ROLES.KADER, ROLES.PETUGAS_PUSKESMAS),
+  async (req, res, next) => {
+    try {
+      const sessionId = Number(req.params.sessionId);
+      const attendanceId = Number(req.params.id);
+      if (!Number.isInteger(sessionId) || sessionId <= 0 || !Number.isInteger(attendanceId) || attendanceId <= 0) {
+        throw AppError.badRequest('ID sesi atau ID kehadiran tidak valid.');
+      }
+
+      const payload = updateAttendanceStatusSchema.parse(req.body || {});
+
+      const [sessRows] = await pool.query(
+        'SELECT * FROM posyandu_sessions WHERE id = ? LIMIT 1',
+        [sessionId]
+      );
+      if (sessRows.length === 0) {
+        throw AppError.notFound('Sesi Posyandu tidak ditemukan.');
+      }
+
+      const sessionRow = sessRows[0];
+      await AccessPolicy.assertPosyanduAccess(req.user, sessionRow.organization_id);
+
+      if (sessionRow.status !== 'open') {
+        throw AppError.badRequest(
+          'Catatan kehadiran pada sesi yang sudah ditutup atau dibatalkan tidak dapat diubah.'
+        );
+      }
+
+      const [attRows] = await pool.query(
+        `SELECT a.*, c.name AS child_name, c.internal_code
+         FROM attendances a
+         INNER JOIN children c ON c.id = a.child_id
+         WHERE a.id = ? AND a.session_id = ?
+         LIMIT 1`,
+        [attendanceId, sessionId]
+      );
+
+      if (attRows.length === 0) {
+        throw AppError.notFound('Catatan kehadiran balita pada sesi ini tidak ditemukan.');
+      }
+
+      const existingAtt = attRows[0];
+      const previousStatus = existingAtt.status;
+
+      const updatedAttendance = await withTransaction(async (conn) => {
+        await conn.query(
+          `UPDATE attendances
+           SET status = ?, recorded_by = ?, recorded_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND session_id = ?`,
+          [payload.status, req.user.id, attendanceId, sessionId]
+        );
+
+        const [afterRows] = await conn.query(
+          `SELECT a.id, a.session_id, a.child_id, a.status, a.recorded_by, u.name AS recorded_by_name, a.recorded_at
+           FROM attendances a
+           INNER JOIN users u ON u.id = a.recorded_by
+           WHERE a.id = ?
+           LIMIT 1`,
+          [attendanceId]
+        );
+
+        await recordAuditLog(
+          {
+            actorId: req.user.id,
+            organizationId: Number(sessionRow.organization_id),
+            action: 'ATTENDANCE_UPDATED',
+            entityType: 'attendance',
+            entityId: attendanceId,
+            requestId: req.requestId,
+            changeSummary: `Mengubah status kehadiran [${existingAtt.internal_code}] ${existingAtt.child_name} pada sesi #${sessionId} dari '${previousStatus}' menjadi '${payload.status}'.`
+          },
+          conn
+        );
+
+        return afterRows[0];
+      });
+
+      return sendSuccess(res, {
+        id: Number(updatedAttendance.id),
+        session_id: Number(updatedAttendance.session_id),
+        child_id: Number(updatedAttendance.child_id),
+        previous_status: previousStatus,
+        status: updatedAttendance.status,
+        recorded_by: Number(updatedAttendance.recorded_by),
+        recorded_by_name: updatedAttendance.recorded_by_name,
+        recorded_at: updatedAttendance.recorded_at
       });
     } catch (err) {
       next(err);

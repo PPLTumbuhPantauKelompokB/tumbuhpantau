@@ -5,6 +5,7 @@ import { env } from '../config/env.js';
 import { pool } from '../config/db.js';
 import { AppError } from '../lib/AppError.js';
 import { AccessPolicy } from '../policies/AccessPolicy.js';
+import { recordAuditLog } from '../services/auditService.js';
 
 const MySQLStore = expressMysqlSession(session);
 
@@ -110,11 +111,23 @@ export async function requireAuth(req, res, next) {
 }
 
 export function requireRoles(...allowedRoles) {
-  return (req, _res, next) => {
+  return async (req, _res, next) => {
     try {
       AccessPolicy.assertRoles(req.user, allowedRoles);
       next();
     } catch (err) {
+      if (err instanceof AppError && err.statusCode === 403 && req.user?.id && !err._auditLogged) {
+        err._auditLogged = true;
+        await recordAuditLog({
+          actorId: req.user.id,
+          organizationId: req.user.organization_id,
+          action: 'ACCESS_DENIED',
+          entityType: 'rbac_endpoint',
+          entityId: null,
+          requestId: req.requestId,
+          changeSummary: `Penolakan RBAC (${req.user.role}) pada ${req.method} ${req.originalUrl || req.url}.`
+        }).catch(() => {});
+      }
       next(err);
     }
   };

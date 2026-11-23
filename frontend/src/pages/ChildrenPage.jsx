@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
+  formatCategoryInfo,
   getInitials,
   getAvatarToneClass
 } from '../utils/formatters.js';
@@ -18,6 +19,7 @@ export function ChildrenPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [orgFilter, setOrgFilter] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formState, setFormState] = useState({
@@ -113,6 +115,34 @@ export function ChildrenPage() {
     submitChildRegistration(false);
   };
 
+  const handleActivateChild = async (child) => {
+    setFormFeedback(null);
+    try {
+      await apiRequest(`/children/${child.id}/activate`, {
+        method: 'PATCH'
+      });
+      setFormFeedback({
+        type: 'success',
+        text: `Profil balita ${child.name} (${child.internal_code}) berhasil diaktifkan kembali.`
+      });
+      await loadChildren();
+    } catch (err) {
+      setFormFeedback({
+        type: 'danger',
+        text: err.message || 'Gagal mengaktifkan kembali profil balita.'
+      });
+    }
+  };
+
+  const sortedChildren = [...children].sort((a, b) => {
+    if (sortBy === 'az') return (a.name || '').localeCompare(b.name || '', 'id');
+    if (sortBy === 'za') return (b.name || '').localeCompare(a.name || '', 'id');
+    if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+    if (sortBy === 'age_asc') return Number(a.age_days_current || 0) - Number(b.age_days_current || 0);
+    if (sortBy === 'age_desc') return Number(b.age_days_current || 0) - Number(a.age_days_current || 0);
+    return Number(b.id) - Number(a.id);
+  });
+
   return (
     <div className="d-flex flex-column gap-4">
       {formFeedback && (
@@ -132,9 +162,9 @@ export function ChildrenPage() {
 
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
-          <h2 className="h5 fw-bold text-dark mb-1">Data Balita Terdaftar</h2>
+          <h2 className="h5 fw-bold text-dark mb-1">Data Balita</h2>
           <p className="small text-secondary mb-0">
-            Daftar anak usia 0-59 bulan dengan kode unik Posyandu dan data orang tua/wali.
+            Kelola profil balita (0-59 bulan) beserta orang tua/wali dan status gizi terkini.
           </p>
         </div>
 
@@ -142,194 +172,202 @@ export function ChildrenPage() {
           type="button"
           className="btn btn-tp-primary"
           onClick={() => {
-            setShowCreateForm((prev) => !prev);
+            setShowCreateForm(true);
             setDuplicateWarning(null);
           }}
         >
-          <Icon name={showCreateForm ? 'close' : 'plus'} size={17} />
-          <span>{showCreateForm ? 'Tutup Form' : 'Daftar Balita Baru'}</span>
+          <Icon name="plus" size={17} />
+          <span>Daftar Balita Baru</span>
         </button>
       </div>
 
       {showCreateForm && (
-        <div className="tp-card border-success" style={{ borderWidth: '1.5px' }}>
-          <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
-            <div>
-              <h3 className="h6 fw-bold mb-0">Pendaftaran Balita Baru (0-59 Bulan)</h3>
-              <div className="small text-secondary">
-                Kode unik internal akan dibuat otomatis berdasarkan unit Posyandu.
+        <div
+          className="tp-popup-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowCreateForm(false)}
+        >
+          <div className="tp-form-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
+              <div>
+                <h3 className="h6 fw-bold mb-0">Daftar Balita Baru (0-59 Bulan)</h3>
+                <div className="small text-secondary">
+                  Kode unik internal dibuat otomatis sesuai Posyandu.
+                </div>
               </div>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowCreateForm(false)}
+                aria-label="Tutup form pendaftaran"
+              />
             </div>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setShowCreateForm(false)}
-              aria-label="Tutup form pendaftaran"
-            />
-          </div>
 
-          {duplicateWarning && (
-            <div className="alert alert-warning rounded-3">
-              <div className="fw-bold mb-1">Peringatan Kemungkinan Data Duplikat</div>
-              <div className="small mb-2">{duplicateWarning.message}</div>
-              <div className="d-flex gap-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-warning fw-semibold"
-                  onClick={() => submitChildRegistration(true)}
-                  disabled={submitting}
-                >
-                  Tetap Simpan (Balita Berbeda)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setDuplicateWarning(null)}
-                >
-                  Periksa Kembali
-                </button>
+            {duplicateWarning && (
+              <div className="alert alert-warning rounded-3">
+                <div className="fw-bold mb-1">Kemungkinan Data Duplikat</div>
+                <div className="small mb-2">{duplicateWarning.message}</div>
+                <div className="d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-warning fw-semibold"
+                    onClick={() => submitChildRegistration(true)}
+                    disabled={submitting}
+                  >
+                    Tetap Simpan (Anak Berbeda)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => setDuplicateWarning(null)}
+                  >
+                    Periksa Lagi
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <form onSubmit={handleCreateSubmit}>
-            <div className="row g-3">
-              {user?.role !== 'kader' && (
-                <div className="col-md-4">
-                  <label htmlFor="child-org" className="form-label small fw-semibold">
-                    Unit Posyandu
+            <form onSubmit={handleCreateSubmit}>
+              <div className="row g-3">
+                {user?.role !== 'kader' && (
+                  <div className="col-md-12">
+                    <label htmlFor="child-org" className="form-label small fw-semibold">
+                      Unit Posyandu
+                    </label>
+                    <select
+                      id="child-org"
+                      className="form-select"
+                      value={formState.organization_id}
+                      onChange={(e) =>
+                        setFormState({ ...formState, organization_id: e.target.value })
+                      }
+                      required
+                    >
+                      {organizations.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} ({o.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="col-md-6">
+                  <label htmlFor="child-name" className="form-label small fw-semibold">
+                    Nama Lengkap Balita
+                  </label>
+                  <input
+                    id="child-name"
+                    type="text"
+                    className="form-control"
+                    value={formState.name}
+                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                    placeholder="Contoh: Arka Pratama"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="col-md-3">
+                  <label htmlFor="child-dob" className="form-label small fw-semibold">
+                    Tanggal Lahir
+                  </label>
+                  <input
+                    id="child-dob"
+                    type="date"
+                    className="form-control font-mono-num"
+                    value={formState.birth_date}
+                    onChange={(e) => setFormState({ ...formState, birth_date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="col-md-3">
+                  <label htmlFor="child-sex" className="form-label small fw-semibold">
+                    Jenis Kelamin
                   </label>
                   <select
-                    id="child-org"
+                    id="child-sex"
                     className="form-select"
-                    value={formState.organization_id}
-                    onChange={(e) =>
-                      setFormState({ ...formState, organization_id: e.target.value })
-                    }
-                    required
+                    value={formState.sex}
+                    onChange={(e) => setFormState({ ...formState, sex: e.target.value })}
                   >
-                    {organizations.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name} ({o.code})
-                      </option>
-                    ))}
+                    <option value="L">Laki-laki (L)</option>
+                    <option value="P">Perempuan (P)</option>
                   </select>
                 </div>
-              )}
 
-              <div className="col-md-4">
-                <label htmlFor="child-name" className="form-label small fw-semibold">
-                  Nama Lengkap Balita
-                </label>
-                <input
-                  id="child-name"
-                  type="text"
-                  className="form-control"
-                  value={formState.name}
-                  onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                  placeholder="Contoh: Arka Pratama"
-                  required
-                />
-              </div>
+                <div className="col-md-5">
+                  <label htmlFor="guardian-name" className="form-label small fw-semibold">
+                    Nama Orang Tua / Wali
+                  </label>
+                  <input
+                    id="guardian-name"
+                    type="text"
+                    className="form-control"
+                    value={formState.guardian_name}
+                    onChange={(e) => setFormState({ ...formState, guardian_name: e.target.value })}
+                    placeholder="Contoh: Ibu Wulandari"
+                    required
+                  />
+                </div>
 
-              <div className="col-md-2">
-                <label htmlFor="child-dob" className="form-label small fw-semibold">
-                  Tanggal Lahir
-                </label>
-                <input
-                  id="child-dob"
-                  type="date"
-                  className="form-control font-mono-num"
-                  value={formState.birth_date}
-                  onChange={(e) => setFormState({ ...formState, birth_date: e.target.value })}
-                  required
-                />
-              </div>
+                <div className="col-md-3">
+                  <label htmlFor="guardian-rel" className="form-label small fw-semibold">
+                    Hubungan
+                  </label>
+                  <select
+                    id="guardian-rel"
+                    className="form-select"
+                    value={formState.guardian_relationship}
+                    onChange={(e) =>
+                      setFormState({ ...formState, guardian_relationship: e.target.value })
+                    }
+                  >
+                    <option value="Ibu">Ibu Kandung</option>
+                    <option value="Ayah">Ayah Kandung</option>
+                    <option value="Nenek/Kakek">Nenek / Kakek</option>
+                    <option value="Wali Lainnya">Wali Lainnya</option>
+                  </select>
+                </div>
 
-              <div className="col-md-2">
-                <label htmlFor="child-sex" className="form-label small fw-semibold">
-                  Jenis Kelamin
-                </label>
-                <select
-                  id="child-sex"
-                  className="form-select"
-                  value={formState.sex}
-                  onChange={(e) => setFormState({ ...formState, sex: e.target.value })}
-                >
-                  <option value="L">Laki-laki (L)</option>
-                  <option value="P">Perempuan (P)</option>
-                </select>
-              </div>
+                <div className="col-md-4">
+                  <label htmlFor="guardian-phone" className="form-label small fw-semibold">
+                    No. Telepon (Opsional)
+                  </label>
+                  <input
+                    id="guardian-phone"
+                    type="text"
+                    className="form-control font-mono-num"
+                    value={formState.guardian_phone}
+                    onChange={(e) => setFormState({ ...formState, guardian_phone: e.target.value })}
+                    placeholder="0812-xxxx-xxxx"
+                  />
+                </div>
 
-              <div className="col-md-4">
-                <label htmlFor="guardian-name" className="form-label small fw-semibold">
-                  Nama Orang Tua / Wali
-                </label>
-                <input
-                  id="guardian-name"
-                  type="text"
-                  className="form-control"
-                  value={formState.guardian_name}
-                  onChange={(e) => setFormState({ ...formState, guardian_name: e.target.value })}
-                  placeholder="Contoh: Ibu Wulandari"
-                  required
-                />
+                <div className="col-12 d-flex justify-content-end gap-2 pt-3 border-top">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowCreateForm(false)}
+                  >
+                    Batal
+                  </button>
+                  <button type="submit" className="btn btn-tp-primary" disabled={submitting}>
+                    <Icon name="user-check" size={16} />
+                    <span>{submitting ? 'Menyimpan...' : 'Simpan Data Balita'}</span>
+                  </button>
+                </div>
               </div>
-
-              <div className="col-md-4">
-                <label htmlFor="guardian-rel" className="form-label small fw-semibold">
-                  Hubungan Pengasuh
-                </label>
-                <select
-                  id="guardian-rel"
-                  className="form-select"
-                  value={formState.guardian_relationship}
-                  onChange={(e) =>
-                    setFormState({ ...formState, guardian_relationship: e.target.value })
-                  }
-                >
-                  <option value="Ibu">Ibu Kandung</option>
-                  <option value="Ayah">Ayah Kandung</option>
-                  <option value="Nenek/Kakek">Nenek / Kakek</option>
-                  <option value="Wali Lainnya">Wali Lainnya</option>
-                </select>
-              </div>
-
-              <div className="col-md-4">
-                <label htmlFor="guardian-phone" className="form-label small fw-semibold">
-                  No. Telepon Wali (Opsional)
-                </label>
-                <input
-                  id="guardian-phone"
-                  type="text"
-                  className="form-control font-mono-num"
-                  value={formState.guardian_phone}
-                  onChange={(e) => setFormState({ ...formState, guardian_phone: e.target.value })}
-                  placeholder="0812-xxxx-xxxx"
-                />
-              </div>
-
-              <div className="col-12 d-flex justify-content-end gap-2 pt-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={() => setShowCreateForm(false)}
-                >
-                  Batal
-                </button>
-                <button type="submit" className="btn btn-tp-primary" disabled={submitting}>
-                  <Icon name="user-check" size={16} />
-                  <span>{submitting ? 'Menyimpan...' : 'Simpan Data Balita'}</span>
-                </button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
       <div className="tp-filter-bar">
         <div className="row g-2 align-items-center">
-          <div className="col-md-5">
+          <div className={user?.role !== 'kader' ? 'col-md-4' : 'col-md-5'}>
             <div className="tp-input-icon-group">
               <span className="tp-input-icon-left">
                 <Icon name="search" size={16} />
@@ -338,7 +376,7 @@ export function ChildrenPage() {
                 type="search"
                 className="form-control form-control-sm tp-input-with-icon"
                 style={{ minHeight: '38px' }}
-                placeholder="Cari nama balita, kode internal, atau nama wali"
+                placeholder="Cari nama balita, kode internal, atau nama wali..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Cari balita"
@@ -347,7 +385,7 @@ export function ChildrenPage() {
           </div>
 
           {user?.role !== 'kader' && (
-            <div className="col-md-4">
+            <div className="col-md-3">
               <select
                 className="form-select form-select-sm rounded-3"
                 style={{ minHeight: '38px' }}
@@ -365,7 +403,7 @@ export function ChildrenPage() {
             </div>
           )}
 
-          <div className="col-md-3">
+          <div className={user?.role !== 'kader' ? 'col-md-2' : 'col-md-3'}>
             <select
               className="form-select form-select-sm rounded-3"
               style={{ minHeight: '38px' }}
@@ -378,6 +416,23 @@ export function ChildrenPage() {
               <option value="all">Semua Status</option>
             </select>
           </div>
+
+          <div className={user?.role !== 'kader' ? 'col-md-3' : 'col-md-4'}>
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Data Balita"
+            >
+              <option value="newest">Urutkan: Terbaru Diupload</option>
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="oldest">Urutkan: Terlama Diupload</option>
+              <option value="age_asc">Urutkan: Usia Termuda</option>
+              <option value="age_desc">Urutkan: Usia Tertua</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -386,9 +441,9 @@ export function ChildrenPage() {
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">Memuat daftar balita...</div>
-        ) : children.length === 0 ? (
+        ) : sortedChildren.length === 0 ? (
           <div className="text-center py-5 small text-secondary">
-            Tidak ditemukan data balita yang sesuai dengan filter.
+            Tidak ditemukan data balita yang sesuai dengan pencarian/filter.
           </div>
         ) : (
           <div className="table-responsive">
@@ -399,14 +454,16 @@ export function ChildrenPage() {
                   <th>Usia & Tgl Lahir</th>
                   <th>Orang Tua / Wali</th>
                   <th>Unit Posyandu</th>
-                  <th>Riwayat Kehadiran</th>
+                  <th>Status Gizi Terkini</th>
                   <th>Status</th>
                   <th className="text-end">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {children.map((c) => {
+                {sortedChildren.map((c) => {
                   const avatarTone = getAvatarToneClass(c.internal_code || c.name);
+                  const lm = c.latest_measurement;
+                  const catInfo = formatCategoryInfo(lm?.category);
 
                   return (
                     <tr key={c.id}>
@@ -444,9 +501,20 @@ export function ChildrenPage() {
                         <div className="small text-secondary font-mono-num">{c.posyandu_code}</div>
                       </td>
                       <td>
-                        <span className="tp-badge tp-badge-green font-mono-num">
-                          {c.attendance_count} kali hadir
-                        </span>
+                        {lm ? (
+                          <div className="d-flex flex-column align-items-start gap-1">
+                            <span className={`tp-badge ${catInfo.badgeClass}`}>
+                              {catInfo.label} ({lm.z_score} SD)
+                            </span>
+                            <span className="small text-secondary font-mono-num">
+                              {lm.length_height_cm} cm &middot; {lm.weight_kg} kg
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="tp-badge tp-badge-neutral font-mono-num">
+                            {c.attendance_count} kali hadir
+                          </span>
+                        )}
                       </td>
                       <td>
                         <span
@@ -458,10 +526,22 @@ export function ChildrenPage() {
                         </span>
                       </td>
                       <td className="text-end">
-                        <Link to={`/anak/${c.id}`} className="btn btn-sm btn-tp-soft">
-                          <span>Profil & Riwayat</span>
-                          <Icon name="arrow-right" size={15} />
-                        </Link>
+                        <div className="d-inline-flex align-items-center gap-2">
+                          {c.inactive_on && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-success rounded-3"
+                              onClick={() => handleActivateChild(c)}
+                            >
+                              <Icon name="user-check" size={14} />
+                              <span>Aktifkan</span>
+                            </button>
+                          )}
+                          <Link to={`/anak/${c.id}`} className="btn btn-sm btn-tp-soft">
+                            <span>Profil & Riwayat</span>
+                            <Icon name="arrow-right" size={15} />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

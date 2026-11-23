@@ -6,6 +6,45 @@ import { Icon } from '../components/Icon.jsx';
 export function LandingPage() {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState(() => {
+    try {
+      return localStorage.getItem('tp_theme_mode') === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  const [surfaceStyle, setSurfaceStyle] = useState(() => {
+    try {
+      return localStorage.getItem('tp_surface_style') === 'glass' ? 'glass' : 'solid';
+    } catch {
+      return 'solid';
+    }
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', themeMode);
+    root.setAttribute('data-bs-theme', themeMode);
+    try {
+      localStorage.setItem('tp_theme_mode', themeMode);
+    } catch {}
+  }, [themeMode]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-surface', surfaceStyle);
+    try {
+      localStorage.setItem('tp_surface_style', surfaceStyle);
+    } catch {}
+  }, [surfaceStyle]);
+
+  const toggleThemeMode = () => {
+    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const toggleSurfaceStyle = () => {
+    setSurfaceStyle((prev) => (prev === 'glass' ? 'solid' : 'glass'));
+  };
 
   // Scroll Progress & Scrolled Header State
   const [scrollY, setScrollY] = useState(0);
@@ -65,11 +104,16 @@ export function LandingPage() {
   const [simCount, setSimCount] = useState(24);
   const simTotal = 30;
   const simPercent = Math.round((simCount / simTotal) * 100);
+  const isSimDone = simCount >= simTotal;
 
   const handleSimulateClick = () => {
     if (simCount < simTotal) {
       setSimCount((prev) => prev + 1);
     }
+  };
+
+  const handleCompleteAllSim = () => {
+    setSimCount(simTotal);
   };
 
   const handleResetSim = () => {
@@ -172,6 +216,39 @@ export function LandingPage() {
 
           {/* Action Button & Mobile Toggle */}
           <div className="d-flex align-items-center gap-2">
+            <div className="btn-group btn-group-sm" role="group" aria-label="Pengaturan Tema Visual">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                onClick={toggleThemeMode}
+                title={themeMode === 'dark' ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'}
+                aria-label={themeMode === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
+              >
+                <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={15} />
+                <span className="d-none d-sm-inline">
+                  {themeMode === 'dark' ? 'Terang' : 'Gelap'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${
+                  surfaceStyle === 'glass' ? 'btn-tp-soft' : 'btn-outline-secondary'
+                } d-inline-flex align-items-center gap-1`}
+                onClick={toggleSurfaceStyle}
+                title={
+                  surfaceStyle === 'glass'
+                    ? 'Tema saat ini: Glass (Klik untuk beralih ke Solid)'
+                    : 'Tema saat ini: Solid (Klik untuk beralih ke Glass)'
+                }
+                aria-label="Ubah Tema Solid atau Glass"
+              >
+                <Icon name="layers" size={15} />
+                <span className="d-none d-sm-inline">
+                  {surfaceStyle === 'glass' ? 'Glass' : 'Solid'}
+                </span>
+              </button>
+            </div>
+
             {user ? (
               <Link to={getDashboardPath()} className="btn btn-tp-primary btn-sm px-3">
                 <Icon name="dashboard" size={16} />
@@ -445,10 +522,7 @@ export function LandingPage() {
           <div className="row g-4">
             <div className="col-md-6 col-lg-3">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: 'var(--brand-soft)', color: 'var(--brand-primary)' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-green">
                   <Icon name="clock" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Pelayanan Tanpa Antrean</h3>
@@ -460,10 +534,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-3">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#EFF6FF', color: '#1A56DB' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-blue">
                   <Icon name="check-shield" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Data Akurat & Rapi</h3>
@@ -475,10 +546,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-3">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-amber">
                   <Icon name="chart" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Rekapitulasi Seketika</h3>
@@ -490,10 +558,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-3">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#F3E8FF', color: '#7E22CE' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-green">
                   <Icon name="database" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Arsip Sehat Terlindungi</h3>
@@ -672,7 +737,7 @@ export function LandingPage() {
                 <div className="tp-benefit-box tp-tab-content-panel">
                   <div className="row align-items-center g-4">
                     <div className="col-md-7">
-                      <span className="tp-badge mb-2" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+                      <span className="tp-badge tp-badge-amber mb-2">
                         Kepuasan Warga
                       </span>
                       <h3 className="h5 fw-bold text-dark mb-3">
@@ -749,10 +814,7 @@ export function LandingPage() {
           <div className="row g-4">
             <div className="col-md-6 col-lg-4">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: 'var(--brand-soft)', color: 'var(--brand-primary)' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-green">
                   <Icon name="child" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Penomoran Balita Otomatis</h3>
@@ -764,10 +826,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-4">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#EFF6FF', color: '#1A56DB' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-blue">
                   <Icon name="user-check" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Presensi 1-Klik & Aksi Massal</h3>
@@ -779,10 +838,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-4">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-amber">
                   <Icon name="users" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Buku Kontak Wali Terpadu</h3>
@@ -794,10 +850,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-4">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: 'var(--brand-soft)', color: 'var(--brand-primary)' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-green">
                   <Icon name="calendar" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Penjadwalan Sesi Aman</h3>
@@ -809,10 +862,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-4">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#EFF6FF', color: '#1A56DB' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-blue">
                   <Icon name="edit" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Koreksi Data & Penonaktifan Rapi</h3>
@@ -824,10 +874,7 @@ export function LandingPage() {
 
             <div className="col-md-6 col-lg-4">
               <div className="tp-feature-card">
-                <div
-                  className="tp-feature-icon-box"
-                  style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
-                >
+                <div className="tp-feature-icon-box tp-stat-icon-amber">
                   <Icon name="log" size={24} />
                 </div>
                 <h3 className="h6 fw-bold text-dark mb-2">Log Audit Aktivitas Transparan</h3>
@@ -892,8 +939,13 @@ export function LandingPage() {
             <div className="col-lg-6">
               <div className="tp-simulation-card">
                 <div className="d-flex justify-content-between align-items-center mb-3">
-                  <div className="fw-bold text-dark fs-6">
-                    Simulasi Presensi Posyandu
+                  <div className="d-flex align-items-center gap-2">
+                    <span className={`tp-badge ${isSimDone ? 'tp-badge-green' : 'tp-badge-blue'}`}>
+                      {isSimDone ? 'Sesi Rampung 100%' : 'Mode Simulasi'}
+                    </span>
+                    <div className="fw-bold text-dark fs-6">
+                      {isSimDone ? 'Rekapitulasi Otomatis Posyandu' : 'Simulasi Presensi Posyandu'}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -923,28 +975,110 @@ export function LandingPage() {
                   <div className="d-flex justify-content-between small text-secondary" style={{ fontSize: '0.72rem' }}>
                     <span>Belum Tercatat: {simTotal - simCount} Anak</span>
                     <span className="text-success fw-semibold">
-                      Status: {simCount === simTotal ? 'Semua Terlayani!' : 'Sedang Berjalan'}
+                      Status: {isSimDone ? 'Semua Terlayani & Terevaluasi!' : 'Sedang Berjalan'}
                     </span>
                   </div>
                 </div>
 
-                <div className="d-flex gap-2 mb-3">
-                  <button
-                    type="button"
-                    className="btn btn-tp-primary w-100 py-3 fw-bold d-flex align-items-center justify-content-center gap-2"
-                    onClick={handleSimulateClick}
-                    disabled={simCount >= simTotal}
-                  >
-                    <Icon name="user-check" size={20} />
-                    <span>
-                      {simCount >= simTotal ? 'Semua Balita Telah Hadir' : 'Klik: Catat 1 Balita Hadir'}
-                    </span>
-                  </button>
-                </div>
+                {!isSimDone ? (
+                  <div key={`sim-step-${simCount}`} className="tp-tab-content-panel">
+                    <div className="p-2 px-3 rounded-3 bg-light border mb-3 d-flex align-items-center justify-content-between gap-2">
+                      <div className="small d-flex align-items-center gap-2">
+                        <Icon name="shield" size={15} className="text-success" />
+                        <span className="text-secondary">
+                          Status Meja Layanan:{' '}
+                          <strong className="text-dark">Peserta ke-{simCount} Tercatat Hadir</strong>
+                        </span>
+                      </div>
+                      <span className="tp-badge tp-badge-green font-mono-num">
+                        Tersimpan (&lt; 1 dtk)
+                      </span>
+                    </div>
 
-                <div className="small text-muted text-center" style={{ fontSize: '0.76rem' }}>
-                  Setiap klik mensimulasikan kecepatan pencatatan 1-detik kader posyandu di lapangan.
-                </div>
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      <button
+                        type="button"
+                        className="btn btn-tp-primary flex-grow-1 py-3 fw-bold d-flex align-items-center justify-content-center gap-2"
+                        onClick={handleSimulateClick}
+                      >
+                        <Icon name="user-check" size={20} />
+                        <span>Klik: Catat 1 Balita Hadir</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-tp-soft py-3 px-3 fw-semibold"
+                        onClick={handleCompleteAllSim}
+                        title="Tandai seluruh sisa kehadiran sekaligus"
+                      >
+                        <span>Tandai Semua (+{simTotal - simCount})</span>
+                      </button>
+                    </div>
+
+                    <div className="small text-muted text-center" style={{ fontSize: '0.76rem' }}>
+                      Simulasi publik tanpa menampilkan identitas balita. Klik hingga 30/30 untuk menyelesaikan sesi.
+                    </div>
+                  </div>
+                ) : (
+                  <div key="sim-completed-panel" className="tp-tab-content-panel">
+                    <div className="p-3 rounded-3 border bg-light mb-3">
+                      <div className="d-flex align-items-center gap-2 mb-2">
+                        <Icon name="check-shield" size={18} className="text-success" />
+                        <span className="fw-bold text-dark small">
+                          Sesi Pelayanan Selesai 100% &amp; Rekapitulasi Otomatis Siap!
+                        </span>
+                      </div>
+
+                      <div className="row g-2 text-center mb-2">
+                        <div className="col-4">
+                          <div className="p-2 rounded-3 bg-white border">
+                            <div className="fw-bold text-success font-mono-num fs-5">100%</div>
+                            <div className="text-secondary" style={{ fontSize: '0.72rem' }}>
+                              Presensi Tersimpan
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-4">
+                          <div className="p-2 rounded-3 bg-white border">
+                            <div className="fw-bold text-primary font-mono-num fs-5">&lt; 1 dtk</div>
+                            <div className="text-secondary" style={{ fontSize: '0.72rem' }}>
+                              Waktu Per Input
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-4">
+                          <div className="p-2 rounded-3 bg-white border">
+                            <div className="fw-bold text-dark font-mono-num fs-5">0 mnt</div>
+                            <div className="text-secondary" style={{ fontSize: '0.72rem' }}>
+                              Hitung Manual
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="small text-secondary" style={{ fontSize: '0.76rem' }}>
+                        Demi menjaga privasi keluarga, detail identitas dan data pertumbuhan hanya ditampilkan kepada petugas berwenang setelah login.
+                      </div>
+                    </div>
+
+                    <div className="d-flex flex-wrap gap-2">
+                      <Link
+                        to={getDashboardPath()}
+                        className="btn btn-tp-primary flex-grow-1 py-2 fw-bold"
+                      >
+                        <span>{user ? 'Buka Dashboard Sistem' : 'Masuk ke Portal Sistem'}</span>
+                        <Icon name="arrow-right" size={16} />
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn btn-tp-soft py-2 px-3"
+                        onClick={handleResetSim}
+                      >
+                        Ulangi Simulasi
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

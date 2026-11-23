@@ -6,6 +6,11 @@ import { sendSuccess } from '../../lib/respond.js';
 import { requireAuth, requireRoles, verifyCsrf } from '../../middlewares/auth.js';
 import { AccessPolicy, ROLES } from '../../policies/AccessPolicy.js';
 import { recordAuditLog } from '../../services/auditService.js';
+import {
+  calculateAgeDays,
+  getWhoReferenceCurves,
+  CLINICAL_DISCLAIMER
+} from '../../services/growthCalculator.js';
 
 export const childrenRouter = Router();
 
@@ -23,13 +28,6 @@ function formatDateOnly(val) {
     return `${y}-${m}-${d}`;
   }
   return String(val).slice(0, 10);
-}
-
-function calculateAgeDays(birthDateStr, referenceDateStr) {
-  const b = new Date(`${birthDateStr}T00:00:00Z`);
-  const r = new Date(`${referenceDateStr}T00:00:00Z`);
-  const diffTime = r.getTime() - b.getTime();
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
 async function generateNextInternalCode(connection, organizationId) {
@@ -111,12 +109,40 @@ childrenRouter.get('/', async (req, res, next) => {
         c.sex,
         c.registered_on,
         c.inactive_on,
-        (SELECT COUNT(*) FROM attendances a WHERE a.child_id = c.id) AS attendance_count
+        (SELECT COUNT(*) FROM attendances a WHERE a.child_id = c.id) AS attendance_count,
+        lm.id AS latest_measurement_id,
+        lm.measured_at AS latest_measured_at,
+        lm.weight_kg AS latest_weight_kg,
+        lm.length_height_cm AS latest_length_height_cm,
+        lm.position AS latest_position,
+        lm.revision_no AS latest_revision_no,
+        ga.id AS latest_assessment_id,
+        ga.age_days AS latest_age_days,
+        ga.adjusted_length_height_cm AS latest_adjusted_cm,
+        ga.z_score AS latest_z_score,
+        ga.category AS latest_category,
+        ga.quality_status AS latest_quality_status,
+        ga.review_status AS latest_review_status
       FROM children c
       INNER JOIN organizations o ON o.id = c.organization_id
       LEFT JOIN guardians g ON g.id = c.guardian_id
+      LEFT JOIN (
+        SELECT m1.*
+        FROM measurements m1
+        INNER JOIN attendances a1 ON a1.id = m1.attendance_id
+        WHERE m1.status = 'submitted'
+          AND m1.id = (
+            SELECT m2.id
+            FROM measurements m2
+            INNER JOIN attendances a2 ON a2.id = m2.attendance_id
+            WHERE a2.child_id = a1.child_id AND m2.status = 'submitted'
+            ORDER BY m2.measured_at DESC, m2.id DESC
+            LIMIT 1
+          )
+      ) lm ON lm.attendance_id IN (SELECT id FROM attendances WHERE child_id = c.id)
+      LEFT JOIN growth_assessments ga ON ga.measurement_id = lm.id
       WHERE ${conditions.join(' AND ')}
-      ORDER BY c.name ASC
+      ORDER BY c.inactive_on IS NOT NULL ASC, c.name ASC
     `;
 
     const [rows] = await pool.query(querySql, params);
@@ -145,7 +171,23 @@ childrenRouter.get('/', async (req, res, next) => {
         attendance_count: Number(child.attendance_count) || 0,
         age_days_current: currentAgeDays,
         age_months_current: currentAgeMonths,
-        latest_measurement: null
+        latest_measurement: child.latest_measurement_id
+          ? {
+              measurement_id: Number(child.latest_measurement_id),
+              assessment_id: child.latest_assessment_id ? Number(child.latest_assessment_id) : null,
+              measured_at: child.latest_measured_at,
+              weight_kg: Number(child.latest_weight_kg),
+              length_height_cm: Number(child.latest_length_height_cm),
+              adjusted_length_height_cm: Number(child.latest_adjusted_cm),
+              position: child.latest_position,
+              revision_no: Number(child.latest_revision_no),
+              age_days: Number(child.latest_age_days),
+              z_score: Number(child.latest_z_score),
+              category: child.latest_category,
+              quality_status: child.latest_quality_status,
+              review_status: child.latest_review_status
+            }
+          : null
       };
     });
 
@@ -392,6 +434,100 @@ childrenRouter.get('/:id', async (req, res, next) => {
       [childId]
     );
 
+    const [measurementRows] = await pool.query(
+      `SELECT
+        m.id AS measurement_id,
+        m.attendance_id,
+        a.session_id,
+        s.session_date,
+        m.revision_no,
+        m.supersedes_id,
+        m.measured_at,
+        m.weight_kg,
+        m.length_height_cm,
+        m.position,
+        m.status,
+        m.correction_reason,
+        m.created_by,
+        u.name AS created_by_name,
+        m.created_at,
+        ga.id AS assessment_id,
+        ga.age_days,
+        ga.adjustment_cm,
+        ga.adjusted_length_height_cm,
+        ga.z_score,
+        ga.category,
+        ga.quality_status,
+        ga.review_reason,
+        ga.review_status,
+        ga.reviewed_by,
+        ru.name AS reviewed_by_name,
+        ga.reviewed_at,
+        ga.review_note
+       FROM measurements m
+       INNER JOIN attendances a ON a.id = m.attendance_id
+       INNER JOIN posyandu_sessions s ON s.id = a.session_id
+       INNER JOIN users u ON u.id = m.created_by
+       LEFT JOIN growth_assessments ga ON ga.measurement_id = m.id
+       LEFT JOIN users ru ON ru.id = ga.reviewed_by
+       WHERE a.child_id = ?
+       ORDER BY s.session_date ASC, m.revision_no ASC, m.id ASC`,
+      [childId]
+    );
+
+    const allRevisions = measurementRows.map((m) => ({
+      measurement_id: Number(m.measurement_id),
+      attendance_id: Number(m.attendance_id),
+      session_id: Number(m.session_id),
+      session_date: formatDateOnly(m.session_date),
+      revision_no: Number(m.revision_no),
+      supersedes_id: m.supersedes_id ? Number(m.supersedes_id) : null,
+      measured_at: m.measured_at,
+      weight_kg: m.weight_kg !== null ? Number(m.weight_kg) : null,
+      length_height_cm: m.length_height_cm !== null ? Number(m.length_height_cm) : null,
+      position: m.position,
+      status: m.status,
+      correction_reason: m.correction_reason,
+      created_by: Number(m.created_by),
+      created_by_name: m.created_by_name,
+      created_at: m.created_at,
+      assessment: m.assessment_id
+        ? {
+            id: Number(m.assessment_id),
+            age_days: Number(m.age_days),
+            age_months: Number((Number(m.age_days) / 30.4375).toFixed(1)),
+            adjustment_cm: Number(m.adjustment_cm),
+            adjusted_length_height_cm: Number(m.adjusted_length_height_cm),
+            z_score: Number(m.z_score),
+            category: m.category,
+            quality_status: m.quality_status,
+            review_reason: m.review_reason,
+            review_status: m.review_status,
+            reviewed_by_name: m.reviewed_by_name || null,
+            reviewed_at: m.reviewed_at,
+            review_note: m.review_note
+          }
+        : null
+    }));
+
+    const activeHistory = allRevisions.filter((m) => m.status === 'submitted' && m.assessment);
+
+    const [followUpRows] = await pool.query(
+      `SELECT
+        f.id,
+        f.type,
+        f.description,
+        f.due_date,
+        f.status,
+        f.created_at,
+        u.name AS assigned_to_name
+       FROM follow_ups f
+       INNER JOIN users u ON u.id = f.assigned_to
+       WHERE f.child_id = ?
+       ORDER BY f.created_at DESC`,
+      [childId]
+    );
+
     const birthDateStr = formatDateOnly(childRow.birth_date);
     const todayStr = new Date().toISOString().slice(0, 10);
     const currentAgeDays = Math.max(0, calculateAgeDays(birthDateStr, todayStr));
@@ -421,9 +557,125 @@ childrenRouter.get('/:id', async (req, res, next) => {
         session_date: formatDateOnly(a.session_date)
       })),
       audit_history: auditRows,
-      activeHistory: [],
-      allRevisions: [],
-      whoCurves: null
+      whoCurves: getWhoReferenceCurves(childRow.sex),
+      activeHistory,
+      allRevisions,
+      followUps: followUpRows.map((f) => ({
+        ...f,
+        id: Number(f.id),
+        due_date: formatDateOnly(f.due_date)
+      })),
+      disclaimer: CLINICAL_DISCLAIMER
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+childrenRouter.get('/:id/growth-history', async (req, res, next) => {
+  try {
+    const childId = Number(req.params.id);
+    if (!Number.isInteger(childId) || childId <= 0) {
+      throw AppError.badRequest('ID balita tidak valid.');
+    }
+
+    const [rows] = await pool.query(
+      `SELECT c.id, c.organization_id, c.internal_code, c.name, c.birth_date, c.sex
+       FROM children c
+       WHERE c.id = ?
+       LIMIT 1`,
+      [childId]
+    );
+    if (rows.length === 0) {
+      throw AppError.notFound('Data balita tidak ditemukan.');
+    }
+
+    const childRow = rows[0];
+    await AccessPolicy.assertPosyanduAccess(req.user, childRow.organization_id);
+
+    const [measurementRows] = await pool.query(
+      `SELECT
+        m.id AS measurement_id,
+        m.attendance_id,
+        a.session_id,
+        s.session_date,
+        m.revision_no,
+        m.supersedes_id,
+        m.measured_at,
+        m.weight_kg,
+        m.length_height_cm,
+        m.position,
+        m.status,
+        m.correction_reason,
+        m.created_by,
+        u.name AS created_by_name,
+        m.created_at,
+        ga.id AS assessment_id,
+        ga.age_days,
+        ga.adjustment_cm,
+        ga.adjusted_length_height_cm,
+        ga.z_score,
+        ga.category,
+        ga.quality_status,
+        ga.review_reason,
+        ga.review_status
+       FROM measurements m
+       INNER JOIN attendances a ON a.id = m.attendance_id
+       INNER JOIN posyandu_sessions s ON s.id = a.session_id
+       INNER JOIN users u ON u.id = m.created_by
+       LEFT JOIN growth_assessments ga ON ga.measurement_id = m.id
+       WHERE a.child_id = ?
+       ORDER BY s.session_date ASC, m.revision_no ASC, m.id ASC`,
+      [childId]
+    );
+
+    const allRevisions = measurementRows.map((m) => ({
+      measurement_id: Number(m.measurement_id),
+      attendance_id: Number(m.attendance_id),
+      session_id: Number(m.session_id),
+      session_date: formatDateOnly(m.session_date),
+      revision_no: Number(m.revision_no),
+      supersedes_id: m.supersedes_id ? Number(m.supersedes_id) : null,
+      measured_at: m.measured_at,
+      weight_kg: m.weight_kg !== null ? Number(m.weight_kg) : null,
+      length_height_cm: m.length_height_cm !== null ? Number(m.length_height_cm) : null,
+      position: m.position,
+      status: m.status,
+      correction_reason: m.correction_reason,
+      created_by: Number(m.created_by),
+      created_by_name: m.created_by_name,
+      created_at: m.created_at,
+      assessment: m.assessment_id
+        ? {
+            id: Number(m.assessment_id),
+            age_days: Number(m.age_days),
+            age_months: Number((Number(m.age_days) / 30.4375).toFixed(1)),
+            adjustment_cm: Number(m.adjustment_cm),
+            adjusted_length_height_cm: Number(m.adjusted_length_height_cm),
+            z_score: Number(m.z_score),
+            category: m.category,
+            quality_status: m.quality_status,
+            review_reason: m.review_reason,
+            review_status: m.review_status
+          }
+        : null
+    }));
+
+    const activeHistory = allRevisions.filter((m) => m.status === 'submitted' && m.assessment);
+
+    return sendSuccess(res, {
+      child: {
+        id: Number(childRow.id),
+        organization_id: Number(childRow.organization_id),
+        internal_code: childRow.internal_code,
+        name: childRow.name,
+        birth_date: formatDateOnly(childRow.birth_date),
+        sex: childRow.sex
+      },
+      whoCurves: getWhoReferenceCurves(childRow.sex),
+      activeHistory,
+      allRevisions,
+      disclaimer: CLINICAL_DISCLAIMER
     });
   } catch (err) {
     next(err);
@@ -532,6 +784,43 @@ childrenRouter.patch('/:id/deactivate', verifyCsrf, async (req, res, next) => {
     });
 
     return sendSuccess(res, { id: childId, inactive_on: inactiveDate });
+  } catch (err) {
+    next(err);
+  }
+});
+
+childrenRouter.patch('/:id/activate', verifyCsrf, async (req, res, next) => {
+  try {
+    const childId = Number(req.params.id);
+    if (!Number.isInteger(childId) || childId <= 0) {
+      throw AppError.badRequest('ID balita tidak valid.');
+    }
+
+    const [rows] = await pool.query('SELECT * FROM children WHERE id = ? LIMIT 1', [childId]);
+    if (rows.length === 0) {
+      throw AppError.notFound('Data anak tidak ditemukan.');
+    }
+
+    const child = rows[0];
+    await AccessPolicy.assertPosyanduAccess(req.user, child.organization_id);
+
+    if (child.inactive_on === null) {
+      throw AppError.badRequest('Profil balita ini sudah berstatus aktif.');
+    }
+
+    await pool.query('UPDATE children SET inactive_on = NULL WHERE id = ?', [childId]);
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      organizationId: Number(child.organization_id),
+      action: 'CHILD_ACTIVATED',
+      entityType: 'child',
+      entityId: childId,
+      requestId: req.requestId,
+      changeSummary: `Mengaktifkan kembali profil balita [${child.internal_code}] ${child.name}.`
+    });
+
+    return sendSuccess(res, { id: childId, inactive_on: null, is_active: true });
   } catch (err) {
     next(err);
   }

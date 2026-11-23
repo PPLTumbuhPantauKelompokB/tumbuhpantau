@@ -15,6 +15,9 @@
     "check": "npm run check --workspace backend",
     "db:check": "npm run db:check --workspace backend",
     "db:migrate": "npm run db:migrate --workspace backend",
-    "db:seed": "npm run db:seed --workspace backend"
+    "db:seed": "npm run db:seed --workspace backend",
+    "ui:backup": "node scripts/backup-ui.js",
+    "ui:restore": "node scripts/restore-ui.js",
+    "ui:restore-gradient": "node scripts/restore-before-gradient.js"
   }
 }

@@ -143,9 +143,14 @@ adminRouter.patch(
   }
 );
 
-adminRouter.get('/users', requireAuth, requireRoles(ROLES.ADMINISTRATOR), async (req, res, next) => {
+adminRouter.get('/users', requireAuth, async (req, res, next) => {
   try {
-    const [rows] = await pool.query(`
+    const user = req.user;
+    if (user.role === ROLES.DINAS_KESEHATAN) {
+      throw AppError.forbidden('Dinas Kesehatan tidak memiliki akses ke daftar akun pengguna.');
+    }
+
+    let sql = `
       SELECT
         u.id,
         u.username,
@@ -159,9 +164,28 @@ adminRouter.get('/users', requireAuth, requireRoles(ROLES.ADMINISTRATOR), async 
         o.type AS organization_type
       FROM users u
       INNER JOIN organizations o ON o.id = u.organization_id
-      ORDER BY u.created_at DESC
-    `);
-    return sendSuccess(res, rows);
+    `;
+    const params = [];
+
+    if (user.role === ROLES.KADER) {
+      sql += ' WHERE u.organization_id = ? AND u.is_active = 1';
+      params.push(user.organization_id);
+    } else if (user.role === ROLES.PETUGAS_PUSKESMAS) {
+      sql += ' WHERE (u.organization_id = ? OR o.parent_id = ?) AND u.is_active = 1';
+      params.push(user.organization_id, user.organization_id);
+    }
+
+    sql += ' ORDER BY u.role ASC, u.name ASC';
+    const [rows] = await pool.query(sql, params);
+    return sendSuccess(
+      res,
+      rows.map((r) => ({
+        ...r,
+        id: Number(r.id),
+        organization_id: Number(r.organization_id),
+        is_active: Boolean(r.is_active)
+      }))
+    );
   } catch (err) {
     next(err);
   }
@@ -291,12 +315,26 @@ adminRouter.get(
   requireRoles(ROLES.ADMINISTRATOR, ROLES.PETUGAS_PUSKESMAS),
   async (req, res, next) => {
     try {
-      const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
-      const actionFilter = req.query.action ? String(req.query.action) : null;
+      const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+      const actionFilter = req.query.action ? String(req.query.action).trim() : null;
+      const entityTypeFilter = req.query.entityType || req.query.entity_type
+        ? String(req.query.entityType || req.query.entity_type).trim()
+        : null;
+      const actorIdFilter = req.query.actorId || req.query.actor_id
+        ? Number(req.query.actorId || req.query.actor_id)
+        : null;
+      const startDate = req.query.startDate || req.query.start_date
+        ? String(req.query.startDate || req.query.start_date).trim().slice(0, 10)
+        : null;
+      const endDate = req.query.endDate || req.query.end_date
+        ? String(req.query.endDate || req.query.end_date).trim().slice(0, 10)
+        : null;
 
       let sql = `
         SELECT
           a.id,
+          a.actor_id,
+          a.organization_id,
           a.occurred_at,
           a.action,
           a.entity_type,
@@ -305,30 +343,62 @@ adminRouter.get(
           a.change_summary,
           u.name AS actor_name,
           u.username AS actor_username,
-          o.name AS organization_name
+          u.role AS actor_role,
+          o.name AS organization_name,
+          o.code AS organization_code
         FROM audit_logs a
         LEFT JOIN users u ON u.id = a.actor_id
         LEFT JOIN organizations o ON o.id = a.organization_id
+        WHERE 1=1
       `;
       const params = [];
 
       if (req.user.role === ROLES.PETUGAS_PUSKESMAS) {
-        sql += ` WHERE (a.organization_id = ? OR a.organization_id IN (
+        sql += ` AND (a.organization_id = ? OR a.organization_id IN (
           SELECT id FROM organizations WHERE parent_id = ?
         ))`;
         params.push(req.user.organization_id, req.user.organization_id);
       }
 
       if (actionFilter) {
-        sql += (params.length > 0 ? ' AND ' : ' WHERE ') + ` a.action = ?`;
+        sql += ` AND a.action = ?`;
         params.push(actionFilter);
       }
 
-      sql += ` ORDER BY a.occurred_at DESC LIMIT ?`;
+      if (entityTypeFilter) {
+        sql += ` AND a.entity_type = ?`;
+        params.push(entityTypeFilter);
+      }
+
+      if (actorIdFilter && Number.isInteger(actorIdFilter) && actorIdFilter > 0) {
+        sql += ` AND a.actor_id = ?`;
+        params.push(actorIdFilter);
+      }
+
+      if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+        sql += ` AND a.occurred_at >= ?`;
+        params.push(`${startDate} 00:00:00`);
+      }
+
+      if (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        sql += ` AND a.occurred_at <= ?`;
+        params.push(`${endDate} 23:59:59`);
+      }
+
+      sql += ` ORDER BY a.occurred_at DESC, a.id DESC LIMIT ?`;
       params.push(limit);
 
       const [rows] = await pool.query(sql, params);
-      return sendSuccess(res, rows);
+      return sendSuccess(
+        res,
+        rows.map((r) => ({
+          ...r,
+          id: Number(r.id),
+          actor_id: r.actor_id ? Number(r.actor_id) : null,
+          organization_id: r.organization_id ? Number(r.organization_id) : null,
+          entity_id: r.entity_id ? Number(r.entity_id) : null
+        }))
+      );
     } catch (err) {
       next(err);
     }

@@ -13,6 +13,7 @@ export function GuardiansPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [orgFilter, setOrgFilter] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formState, setFormState] = useState({
@@ -88,6 +89,16 @@ export function GuardiansPage() {
     }
   };
 
+  const sortedGuardians = [...guardians].sort((a, b) => {
+    if (sortBy === 'az') return (a.name || '').localeCompare(b.name || '', 'id');
+    if (sortBy === 'za') return (b.name || '').localeCompare(a.name || '', 'id');
+    if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+    if (sortBy === 'children_desc') {
+      return Number(b.active_children_count || 0) - Number(a.active_children_count || 0);
+    }
+    return Number(b.id) - Number(a.id);
+  });
+
   return (
     <div className="d-flex flex-column gap-4">
       {feedback && (
@@ -116,98 +127,108 @@ export function GuardiansPage() {
         <button
           type="button"
           className="btn btn-tp-primary"
-          onClick={() => setShowCreateForm((prev) => !prev)}
+          onClick={() => setShowCreateForm(true)}
         >
-          <Icon name={showCreateForm ? 'close' : 'plus'} size={17} />
-          <span>{showCreateForm ? 'Tutup Form' : 'Tambah Wali Baru'}</span>
+          <Icon name="plus" size={17} />
+          <span>Tambah Wali Baru</span>
         </button>
       </div>
 
       {showCreateForm && (
-        <div className="tp-card border-success" style={{ borderWidth: '1.5px' }}>
-          <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
-            <h3 className="h6 fw-bold mb-0">Tambah Data Orang Tua / Wali</h3>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setShowCreateForm(false)}
-              aria-label="Tutup form"
-            />
-          </div>
-
-          <form onSubmit={handleCreateGuardian} className="row g-3">
-            {user?.role !== 'kader' && (
-              <div className="col-md-4">
-                <label className="form-label small fw-semibold">Unit Posyandu</label>
-                <select
-                  className="form-select"
-                  value={formState.organization_id}
-                  onChange={(e) => setFormState({ ...formState, organization_id: e.target.value })}
-                  required
-                >
-                  {organizations.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name} ({o.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">Nama Lengkap Orang Tua / Wali</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Contoh: Ibu Siti Aminah"
-                value={formState.name}
-                onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">Nomor Telepon / WhatsApp</label>
-              <input
-                type="text"
-                className="form-control font-mono-num"
-                placeholder="0812-xxxx-xxxx"
-                value={formState.phone}
-                onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
-              />
-            </div>
-
-            <div className="col-md-12">
-              <label className="form-label small fw-semibold">Alamat Tempat Tinggal</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Contoh: RT 03/RW 02 Kelurahan Melati"
-                value={formState.address}
-                onChange={(e) => setFormState({ ...formState, address: e.target.value })}
-              />
-            </div>
-
-            <div className="col-12 d-flex justify-content-end gap-2 pt-2">
+        <div
+          className="tp-popup-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowCreateForm(false)}
+        >
+          <div className="tp-form-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
+              <h3 className="h6 fw-bold mb-0">Tambah Data Orang Tua / Wali</h3>
               <button
                 type="button"
-                className="btn btn-outline-secondary"
+                className="btn-close"
                 onClick={() => setShowCreateForm(false)}
-              >
-                Batal
-              </button>
-              <button type="submit" className="btn btn-tp-primary" disabled={submitting}>
-                <Icon name="user-check" size={16} />
-                <span>{submitting ? 'Menyimpan...' : 'Simpan Data Wali'}</span>
-              </button>
+                aria-label="Tutup form"
+              />
             </div>
-          </form>
+
+            <form onSubmit={handleCreateGuardian} className="row g-3">
+              {user?.role !== 'kader' && (
+                <div className="col-md-12">
+                  <label className="form-label small fw-semibold">Unit Posyandu</label>
+                  <select
+                    className="form-select"
+                    value={formState.organization_id}
+                    onChange={(e) =>
+                      setFormState({ ...formState, organization_id: e.target.value })
+                    }
+                    required
+                  >
+                    {organizations.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name} ({o.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="col-md-7">
+                <label className="form-label small fw-semibold">Nama Lengkap Orang Tua / Wali</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Contoh: Ibu Siti Aminah"
+                  value={formState.name}
+                  onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="col-md-5">
+                <label className="form-label small fw-semibold">Nomor Telepon / WhatsApp</label>
+                <input
+                  type="text"
+                  className="form-control font-mono-num"
+                  placeholder="0812-xxxx-xxxx"
+                  value={formState.phone}
+                  onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
+                />
+              </div>
+
+              <div className="col-md-12">
+                <label className="form-label small fw-semibold">Alamat Tempat Tinggal</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Contoh: RT 03/RW 02 Kelurahan Melati"
+                  value={formState.address}
+                  onChange={(e) => setFormState({ ...formState, address: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 d-flex justify-content-end gap-2 pt-3 border-top">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  Batal
+                </button>
+                <button type="submit" className="btn btn-tp-primary" disabled={submitting}>
+                  <Icon name="user-check" size={16} />
+                  <span>{submitting ? 'Menyimpan...' : 'Simpan Data Wali'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       <div className="tp-filter-bar">
         <div className="row g-2 align-items-center">
-          <div className="col-md-7">
+          <div className={user?.role !== 'kader' ? 'col-md-5' : 'col-md-8'}>
             <div className="tp-input-icon-group">
               <span className="tp-input-icon-left">
                 <Icon name="search" size={16} />
@@ -216,7 +237,7 @@ export function GuardiansPage() {
                 type="search"
                 className="form-control form-control-sm tp-input-with-icon"
                 style={{ minHeight: '38px' }}
-                placeholder="Cari nama wali, nomor telepon, atau alamat"
+                placeholder="Cari nama wali, nomor telepon, atau alamat..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Cari wali"
@@ -225,7 +246,7 @@ export function GuardiansPage() {
           </div>
 
           {user?.role !== 'kader' && (
-            <div className="col-md-5">
+            <div className="col-md-3">
               <select
                 className="form-select form-select-sm rounded-3"
                 style={{ minHeight: '38px' }}
@@ -242,6 +263,22 @@ export function GuardiansPage() {
               </select>
             </div>
           )}
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Data Wali"
+            >
+              <option value="newest">Urutkan: Terbaru Diupload</option>
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="oldest">Urutkan: Terlama Diupload</option>
+              <option value="children_desc">Urutkan: Jumlah Anak Terbanyak</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -250,7 +287,7 @@ export function GuardiansPage() {
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">Memuat daftar wali...</div>
-        ) : guardians.length === 0 ? (
+        ) : sortedGuardians.length === 0 ? (
           <div className="text-center py-5 small text-secondary">
             Belum ada data orang tua / wali yang sesuai filter.
           </div>
@@ -268,7 +305,7 @@ export function GuardiansPage() {
                 </tr>
               </thead>
               <tbody>
-                {guardians.map((g) => (
+                {sortedGuardians.map((g) => (
                   <tr key={g.id}>
                     <td>
                       <div className="fw-bold text-dark">{g.name}</div>

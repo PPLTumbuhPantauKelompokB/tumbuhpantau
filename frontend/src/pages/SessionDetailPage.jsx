@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
+  formatCategoryInfo,
+  formatPositionLabel,
   getInitials,
   getAvatarToneClass
 } from '../utils/formatters.js';
@@ -11,6 +13,7 @@ import { Icon } from '../components/Icon.jsx';
 export function SessionDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [sessionData, setSessionData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,6 +22,8 @@ export function SessionDetailPage() {
   const [savingAttendance, setSavingAttendance] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [attFilter, setAttFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('az');
 
   const [showEditSchedule, setShowEditSchedule] = useState(false);
   const [editDate, setEditDate] = useState('');
@@ -68,6 +73,30 @@ export function SessionDetailPage() {
     } finally {
       setSavingAttendance(false);
     }
+  };
+
+  const handleToggleSingleAttendance = async (childItem, nextStatus) => {
+    if (childItem.attendance_id) {
+      setSavingAttendance(true);
+      setFeedback(null);
+      try {
+        await apiRequest(`/sessions/${id}/attendances/${childItem.attendance_id}`, {
+          method: 'PATCH',
+          body: { status: nextStatus }
+        });
+        await loadSessionDetail();
+        setFeedback({
+          type: 'success',
+          text: `Status kehadiran ${childItem.child_name} diperbarui menjadi ${nextStatus === 'present' ? 'Hadir' : 'Tidak Hadir'}.`
+        });
+      } catch (err) {
+        setFeedback({ type: 'danger', text: err.message || 'Gagal mengubah status kehadiran.' });
+      } finally {
+        setSavingAttendance(false);
+      }
+      return;
+    }
+    await recordAttendanceItems([{ child_id: childItem.child_id, status: nextStatus }]);
   };
 
   const handleBulkMarkPresent = () => {
@@ -158,15 +187,39 @@ export function SessionDetailPage() {
   const isKader = user?.role === 'kader';
   const isOpen = session.status === 'open';
 
-  const filteredChildren = children.filter((c) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.child_name.toLowerCase().includes(q) ||
-      c.internal_code.toLowerCase().includes(q) ||
-      (c.guardian_name && c.guardian_name.toLowerCase().includes(q))
-    );
-  });
+  const filteredChildren = children
+    .filter((c) => {
+      if (attFilter === 'present' && c.attendance_status !== 'present') return false;
+      if (attFilter === 'absent' && c.attendance_status !== 'absent') return false;
+      if (attFilter === 'unrecorded' && c.attendance_status) return false;
+      if (attFilter === 'measured' && c.measurement?.status !== 'submitted') return false;
+      if (
+        attFilter === 'unmeasured' &&
+        (c.attendance_status !== 'present' || c.measurement?.status === 'submitted')
+      ) {
+        return false;
+      }
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        c.child_name.toLowerCase().includes(q) ||
+        c.internal_code.toLowerCase().includes(q) ||
+        (c.guardian_name && c.guardian_name.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === 'za') return (b.child_name || '').localeCompare(a.child_name || '', 'id');
+      if (sortBy === 'newest') {
+        const aId = Number(a.measurement?.id || a.attendance_id || a.child_id || 0);
+        const bId = Number(b.measurement?.id || b.attendance_id || b.child_id || 0);
+        return bId - aId;
+      }
+      if (sortBy === 'age_asc') {
+        return Number(a.age_days_at_session || 0) - Number(b.age_days_at_session || 0);
+      }
+      return (a.child_name || '').localeCompare(b.child_name || '', 'id');
+    });
 
   const presentCount = children.filter((c) => c.attendance_status === 'present').length;
   const absentCount = children.filter((c) => c.attendance_status === 'absent').length;
@@ -228,91 +281,104 @@ export function SessionDetailPage() {
       )}
 
       {showEditSchedule && (
-        <div className="tp-card border-success" style={{ borderWidth: '1.5px' }}>
-          <div className="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom">
-            <h3 className="h6 fw-bold mb-0">Penyesuaian Jadwal & Catatan Sesi (SCRUM-23)</h3>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setShowEditSchedule(false)}
-              aria-label="Tutup form"
-            />
-          </div>
-          <form onSubmit={handleUpdateSchedule} className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">Tanggal Pelaksanaan Sesi</label>
-              <input
-                type="date"
-                className="form-control font-mono-num"
-                value={editDate}
-                onChange={(e) => setEditDate(e.target.value)}
-                required
-              />
-            </div>
-            <div className="col-md-8">
-              <label className="form-label small fw-semibold">Catatan / Agenda Pelayanan</label>
-              <input
-                type="text"
-                className="form-control"
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Catatan pelaksanaan sesi"
-              />
-            </div>
-            <div className="col-12 d-flex justify-content-end gap-2 pt-2">
+        <div
+          className="tp-popup-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowEditSchedule(false)}
+        >
+          <div className="tp-form-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
+              <h3 className="h6 fw-bold mb-0">Ubah Jadwal & Catatan Sesi</h3>
               <button
                 type="button"
-                className="btn btn-outline-secondary"
+                className="btn-close"
                 onClick={() => setShowEditSchedule(false)}
-              >
-                Batal
-              </button>
-              <button type="submit" className="btn btn-tp-primary" disabled={updatingSchedule}>
-                {updatingSchedule ? 'Menyimpan...' : 'Simpan Perubahan Jadwal'}
-              </button>
+                aria-label="Tutup form"
+              />
             </div>
-          </form>
+            <form onSubmit={handleUpdateSchedule} className="row g-3">
+              <div className="col-md-5">
+                <label className="form-label small fw-semibold">Tanggal Pelaksanaan</label>
+                <input
+                  type="date"
+                  className="form-control font-mono-num"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="col-md-7">
+                <label className="form-label small fw-semibold">Catatan / Agenda</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Catatan pelaksanaan sesi"
+                />
+              </div>
+              <div className="col-12 d-flex justify-content-end gap-2 pt-3 border-top">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowEditSchedule(false)}
+                >
+                  Batal
+                </button>
+                <button type="submit" className="btn btn-tp-primary" disabled={updatingSchedule}>
+                  {updatingSchedule ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {showCancelModal && (
-        <div className="tp-card border-danger" style={{ borderWidth: '1.5px' }}>
-          <div className="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom">
-            <h3 className="h6 fw-bold text-danger mb-0">Pembatalan Sesi Kegiatan Posyandu</h3>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setShowCancelModal(false)}
-              aria-label="Tutup"
-            />
-          </div>
-          <p className="small text-secondary mb-3">
-            Tindakan ini akan membatalkan sesi Posyandu. Berikan alasan pembatalan kegiatan:
-          </p>
-          <form onSubmit={handleConfirmCancel} className="row g-3">
-            <div className="col-md-9">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Alasan pembatalan (contoh: Posko Posyandu direnovasi)"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                required
-              />
-            </div>
-            <div className="col-md-3 d-flex gap-2">
+        <div
+          className="tp-popup-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowCancelModal(false)}
+        >
+          <div className="tp-form-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
+              <h3 className="h6 fw-bold text-danger mb-0">Batalkan Sesi Kegiatan</h3>
               <button
                 type="button"
-                className="btn btn-outline-secondary flex-fill"
+                className="btn-close"
                 onClick={() => setShowCancelModal(false)}
-              >
-                Batal
-              </button>
-              <button type="submit" className="btn btn-danger flex-fill" disabled={cancelling}>
-                {cancelling ? 'Memproses...' : 'Ya, Batalkan'}
-              </button>
+                aria-label="Tutup"
+              />
             </div>
-          </form>
+            <form onSubmit={handleConfirmCancel} className="row g-3">
+              <div className="col-12">
+                <label className="form-label small fw-semibold">Alasan Pembatalan</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Contoh: Posko Posyandu direnovasi"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="col-12 d-flex justify-content-end gap-2 pt-2 border-top">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowCancelModal(false)}
+                >
+                  Batal
+                </button>
+                <button type="submit" className="btn btn-danger" disabled={cancelling}>
+                  {cancelling ? 'Memproses...' : 'Ya, Batalkan'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -363,7 +429,7 @@ export function SessionDetailPage() {
 
       <div className="tp-filter-bar">
         <div className="row g-2 align-items-center">
-          <div className="col-md-6">
+          <div className="col-md-5">
             <div className="tp-input-icon-group">
               <span className="tp-input-icon-left">
                 <Icon name="search" size={16} />
@@ -372,34 +438,76 @@ export function SessionDetailPage() {
                 type="search"
                 className="form-control form-control-sm tp-input-with-icon"
                 style={{ minHeight: '38px' }}
-                placeholder="Cari balita di sesi ini berdasarkan nama, kode, atau wali"
+                placeholder="Cari nama balita, kode internal, atau nama wali..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Cari balita di sesi"
               />
             </div>
           </div>
-          <div className="col-md-6 text-md-end small text-secondary">
-            Menampilkan <strong>{filteredChildren.length}</strong> dari <strong>{children.length}</strong> sasaran balita
+
+          <div className="col-md-3">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={attFilter}
+              onChange={(e) => setAttFilter(e.target.value)}
+              aria-label="Filter Status Kehadiran"
+            >
+              <option value="all">Semua Sasaran ({children.length})</option>
+              <option value="present">Status: Hadir ({presentCount})</option>
+              <option value="absent">Status: Tidak Hadir ({absentCount})</option>
+              <option value="unrecorded">Status: Belum Dicatat ({unrecordedCount})</option>
+              <option value="measured">Sudah Diukur Lengkap</option>
+              <option value="unmeasured">Hadir Belum Diukur / Draf</option>
+            </select>
+          </div>
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Balita di Sesi"
+            >
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="newest">Urutkan: Terbaru Diinput / Diukur</option>
+              <option value="age_asc">Urutkan: Usia Termuda</option>
+            </select>
           </div>
         </div>
       </div>
 
       <div className="tp-card p-0 overflow-hidden">
+        {isKader && isOpen && (
+          <div
+            className="px-3 py-2 border-bottom small d-flex align-items-center gap-2"
+            style={{ backgroundColor: '#E8F5F1', color: '#065F46' }}
+          >
+            <Icon name="check-shield" size={16} />
+            <span>
+              <strong>Panduan Singkat:</strong> Klik tombol <strong>Hadir</strong> pada balita yang
+              datang, lalu klik tombol hijau <strong>Input Ukur</strong> untuk mengisi BB &amp; TB.
+            </span>
+          </div>
+        )}
         <div className="table-responsive">
           <table className="table tp-table">
             <thead>
               <tr>
-                <th>Profil Balita & Orang Tua</th>
-                <th>Usia pada Hari Sesi</th>
-                <th>Rekomendasi Posisi Ukur</th>
-                <th>Pencatatan Kehadiran (1-Klik)</th>
-                <th>Waktu Catat</th>
-                <th className="text-end">Profil Balita</th>
+                <th>Balita & Wali</th>
+                <th>Usia & Posisi</th>
+                <th>Kehadiran</th>
+                <th>Hasil Ukur & Status Gizi</th>
+                <th className="text-end">Tindakan</th>
               </tr>
             </thead>
             <tbody>
               {filteredChildren.map((c) => {
+                const m = c.measurement;
+                const catInfo = formatCategoryInfo(m?.assessment?.category);
                 const avatarTone = getAvatarToneClass(c.internal_code || c.child_name);
 
                 return (
@@ -424,18 +532,11 @@ export function SessionDetailPage() {
                     </td>
                     <td>
                       <div className="font-mono-num fw-semibold text-dark">
-                        {c.age_months_at_session} bulan
+                        {c.age_months_at_session} bln ({c.age_days_at_session} hr)
                       </div>
-                      <div className="small text-secondary font-mono-num">
-                        ({c.age_days_at_session} hari)
+                      <div className="small text-secondary">
+                        {formatPositionLabel(c.recommended_position)}
                       </div>
-                    </td>
-                    <td>
-                      <span className="small text-dark fw-semibold">
-                        {c.recommended_position === 'recumbent'
-                          ? 'Terlentang (< 24 bln)'
-                          : 'Berdiri (>= 24 bln)'}
-                      </span>
                     </td>
                     <td>
                       {isKader && isOpen ? (
@@ -447,9 +548,7 @@ export function SessionDetailPage() {
                                 ? 'btn-success'
                                 : 'btn-outline-secondary'
                             }`}
-                            onClick={() =>
-                              recordAttendanceItems([{ child_id: c.child_id, status: 'present' }])
-                            }
+                            onClick={() => handleToggleSingleAttendance(c, 'present')}
                             disabled={savingAttendance}
                           >
                             Hadir
@@ -461,9 +560,7 @@ export function SessionDetailPage() {
                                 ? 'btn-secondary'
                                 : 'btn-outline-secondary'
                             }`}
-                            onClick={() =>
-                              recordAttendanceItems([{ child_id: c.child_id, status: 'absent' }])
-                            }
+                            onClick={() => handleToggleSingleAttendance(c, 'absent')}
                             disabled={savingAttendance}
                           >
                             Tidak Hadir
@@ -486,15 +583,104 @@ export function SessionDetailPage() {
                               : 'Belum Dicatat'}
                         </span>
                       )}
+                      {c.attendance_recorded_by_name && (
+                        <div className="text-muted font-mono-num mt-1" style={{ fontSize: '0.72rem' }}>
+                          {c.attendance_recorded_by_name}
+                        </div>
+                      )}
                     </td>
-                    <td className="small text-secondary font-mono-num">
-                      {c.attendance_recorded_at || '-'}
+                    <td>
+                      {m?.status === 'submitted' && m.assessment ? (
+                        <div className="d-flex flex-wrap align-items-center gap-2 font-mono-num small">
+                          <span className="fw-bold text-dark">
+                            {m.length_height_cm} cm &middot; {m.weight_kg} kg
+                          </span>
+                          <span className={`tp-badge ${catInfo.badgeClass}`}>
+                            {catInfo.label} ({m.assessment.z_score} SD)
+                          </span>
+                        </div>
+                      ) : m?.status === 'draft' ? (
+                        <span className="tp-badge tp-badge-amber font-mono-num">
+                          Draf ({m.weight_kg ?? '-'} kg / {m.length_height_cm ?? '-'} cm)
+                        </span>
+                      ) : c.attendance_status === 'present' ? (
+                        <span className="tp-badge tp-badge-neutral">Belum Diinput</span>
+                      ) : (
+                        <span className="small text-secondary">-</span>
+                      )}
                     </td>
                     <td className="text-end">
-                      <Link to={`/anak/${c.child_id}`} className="btn btn-sm btn-tp-soft">
-                        <span>Lihat Profil</span>
-                        <Icon name="arrow-right" size={14} />
-                      </Link>
+                      <div className="d-inline-flex align-items-center gap-1">
+                        {m && (
+                          <Link
+                            to={`/pengukuran/detail/${m.id}`}
+                            className="btn btn-sm btn-outline-secondary rounded-3"
+                            title="Lihat detail catatan pengukuran"
+                          >
+                            Detail
+                          </Link>
+                        )}
+                        {c.attendance_id && c.attendance_status === 'present' ? (
+                          <Link
+                            to={`/pengukuran/${c.attendance_id}`}
+                            className={`btn btn-sm ${
+                              m?.status === 'submitted' ? 'btn-tp-soft' : 'btn-tp-primary'
+                            }`}
+                          >
+                            <Icon name="ruler" size={15} />
+                            <span>
+                              {m?.status === 'submitted'
+                                ? 'Lihat Hasil'
+                                : m?.status === 'draft'
+                                  ? 'Lanjutkan Draf'
+                                  : 'Input Ukur'}
+                            </span>
+                          </Link>
+                        ) : isKader && isOpen ? (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-tp-soft"
+                            disabled={savingAttendance}
+                            onClick={async () => {
+                              setSavingAttendance(true);
+                              try {
+                                let targetAttId = c.attendance_id;
+                                if (targetAttId) {
+                                  await apiRequest(`/sessions/${id}/attendances/${targetAttId}`, {
+                                    method: 'PATCH',
+                                    body: { status: 'present' },
+                                    silentPopup: true
+                                  });
+                                } else {
+                                  const res = await apiRequest(`/sessions/${id}/attendances`, {
+                                    method: 'POST',
+                                    body: { items: [{ child_id: c.child_id, status: 'present' }] },
+                                    silentPopup: true
+                                  });
+                                  targetAttId = res?.attendances?.[0]?.id;
+                                }
+                                if (targetAttId) {
+                                  navigate(`/pengukuran/${targetAttId}`);
+                                } else {
+                                  await loadSessionDetail();
+                                }
+                              } catch (err) {
+                                setFeedback({ type: 'danger', text: err.message });
+                              } finally {
+                                setSavingAttendance(false);
+                              }
+                            }}
+                          >
+                            <Icon name="ruler" size={14} />
+                            <span>Hadir &amp; Ukur</span>
+                          </button>
+                        ) : (
+                          <Link to={`/anak/${c.child_id}`} className="btn btn-sm btn-tp-soft">
+                            <span>Profil</span>
+                            <Icon name="arrow-right" size={14} />
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

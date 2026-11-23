@@ -291,6 +291,26 @@ export function Icon({ name, size = 20, className = '' }) {
           <path d="M12 18h.01" />
         </svg>
       );
+    case 'sun':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="m4.93 4.93 1.41 1.41" />
+          <path d="m17.66 17.66 1.41 1.41" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="m6.34 17.66-1.41 1.41" />
+          <path d="m19.07 4.93-1.41 1.41" />
+        </svg>
+      );
+    case 'moon':
+      return (
+        <svg {...commonProps}>
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </svg>
+      );
     default:
       return (
         <svg {...commonProps}>

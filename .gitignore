@@ -9,3 +9,7 @@ coverage/
 .vscode/
 playwright-report/
 test-results/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc

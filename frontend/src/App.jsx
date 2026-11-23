@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { AppShell } from './components/AppShell.jsx';
+import { InteractiveGlassEngine } from './components/InteractiveGlassEngine.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { LandingPage } from './pages/LandingPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
@@ -11,6 +12,13 @@ import { GuardiansPage } from './pages/GuardiansPage.jsx';
 import { GuardianDetailPage } from './pages/GuardianDetailPage.jsx';
 import { SessionsPage } from './pages/SessionsPage.jsx';
 import { SessionDetailPage } from './pages/SessionDetailPage.jsx';
+import { MeasurementFormPage } from './pages/MeasurementFormPage.jsx';
+import { MeasurementDetailPage } from './pages/MeasurementDetailPage.jsx';
+import { MonitoringPage } from './pages/MonitoringPage.jsx';
+import { ReviewsPage } from './pages/ReviewsPage.jsx';
+import { FollowUpsPage } from './pages/FollowUpsPage.jsx';
+import { FollowUpDetailPage } from './pages/FollowUpDetailPage.jsx';
+import { ReportsPage } from './pages/ReportsPage.jsx';
 import { OrganizationsPage } from './pages/OrganizationsPage.jsx';
 import { UsersPage } from './pages/UsersPage.jsx';
 import { AuditLogsPage } from './pages/AuditLogsPage.jsx';
@@ -61,6 +69,16 @@ function ScrollToTop() {
   const { pathname, hash } = useLocation();
 
   useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('tp_theme_mode') === 'dark' ? 'dark' : 'light';
+      const savedSurface = localStorage.getItem('tp_surface_style') === 'glass' ? 'glass' : 'solid';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.documentElement.setAttribute('data-bs-theme', savedTheme);
+      document.documentElement.setAttribute('data-surface', savedSurface);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     if (!hash) {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
@@ -74,6 +92,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
+        <InteractiveGlassEngine />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<PublicLoginRoute />} />
@@ -137,6 +156,69 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
                 <SessionDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pengukuran/detail/:id"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
+                <MeasurementDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pengukuran/:attendanceId"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
+                <MeasurementFormPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/monitoring"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
+                <MonitoringPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/peninjauan"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
+                <ReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tindak-lanjut"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
+                <FollowUpsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tindak-lanjut/:id"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas']}>
+                <FollowUpDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/laporan"
+            element={
+              <ProtectedRoute allowedRoles={['kader', 'petugas_puskesmas', 'dinas_kesehatan']}>
+                <ReportsPage />
               </ProtectedRoute>
             }
           />

@@ -1,5 +1,6 @@
 import { AppError } from '../lib/AppError.js';
 import { sendError } from '../lib/respond.js';
+import { recordAuditLog } from '../services/auditService.js';
 
 export function notFoundHandler(req, res) {
   return sendError(res, {
@@ -11,6 +12,18 @@ export function notFoundHandler(req, res) {
 
 export function errorHandler(err, req, res, _next) {
   if (err instanceof AppError) {
+    if (err.statusCode === 403 && req?.user?.id && !err._auditLogged) {
+      err._auditLogged = true;
+      recordAuditLog({
+        actorId: req.user.id,
+        organizationId: req.user.organization_id,
+        action: 'ACCESS_DENIED',
+        entityType: 'authorization',
+        entityId: null,
+        requestId: req.requestId,
+        changeSummary: `Penolakan akses (${err.code}) oleh ${req.user.username} pada ${req.method} ${req.originalUrl || req.url}: ${err.message}`
+      }).catch(() => {});
+    }
     return sendError(res, {
       statusCode: err.statusCode,
       code: err.code,

@@ -121,64 +121,72 @@ export function GuardianDetailPage() {
       </div>
 
       {editMode && (
-        <div className="tp-card border-success" style={{ borderWidth: '1.5px' }}>
-          <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
-            <h3 className="h6 fw-bold mb-0">Ubah Informasi Kontak Wali</h3>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setEditMode(false)}
-              aria-label="Tutup form"
-            />
-          </div>
-
-          <form onSubmit={handleUpdate} className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label small fw-semibold">Nama Lengkap</label>
-              <input
-                type="text"
-                className="form-control"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label small fw-semibold">Nomor Telepon</label>
-              <input
-                type="text"
-                className="form-control font-mono-num"
-                value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                placeholder="0812-xxxx-xxxx"
-              />
-            </div>
-
-            <div className="col-12">
-              <label className="form-label small fw-semibold">Alamat Tempat Tinggal</label>
-              <input
-                type="text"
-                className="form-control"
-                value={editForm.address}
-                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-              />
-            </div>
-
-            <div className="col-12 d-flex justify-content-end gap-2 pt-2">
+        <div
+          className="tp-popup-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setEditMode(false)}
+        >
+          <div className="tp-form-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom">
+              <h3 className="h6 fw-bold mb-0">Ubah Informasi Kontak Wali</h3>
               <button
                 type="button"
-                className="btn btn-outline-secondary"
+                className="btn-close"
                 onClick={() => setEditMode(false)}
-              >
-                Batal
-              </button>
-              <button type="submit" className="btn btn-tp-primary" disabled={submitting}>
-                <Icon name="check-shield" size={16} />
-                <span>{submitting ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-              </button>
+                aria-label="Tutup form"
+              />
             </div>
-          </form>
+
+            <form onSubmit={handleUpdate} className="row g-3">
+              <div className="col-md-7">
+                <label className="form-label small fw-semibold">Nama Lengkap</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="col-md-5">
+                <label className="form-label small fw-semibold">Nomor Telepon</label>
+                <input
+                  type="text"
+                  className="form-control font-mono-num"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="0812-xxxx-xxxx"
+                />
+              </div>
+
+              <div className="col-12">
+                <label className="form-label small fw-semibold">Alamat Tempat Tinggal</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editForm.address}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                />
+              </div>
+
+              <div className="col-12 d-flex justify-content-end gap-2 pt-3 border-top">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setEditMode(false)}
+                >
+                  Batal
+                </button>
+                <button type="submit" className="btn btn-tp-primary" disabled={submitting}>
+                  <Icon name="check-shield" size={16} />
+                  <span>{submitting ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

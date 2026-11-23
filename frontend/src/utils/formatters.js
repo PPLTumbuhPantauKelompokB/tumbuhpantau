@@ -1,5 +1,5 @@
 export const CLINICAL_DISCLAIMER =
-  'Hasil pencatatan administratif posyandu. Verifikasi data oleh petugas kesehatan.';
+  'Hasil antropometri, bukan diagnosis. Interpretasi oleh tenaga kesehatan.';
 
 export function formatRoleLabel(role) {
   switch (role) {
@@ -40,6 +40,86 @@ export function formatSessionStatusInfo(status) {
     default:
       return { label: status || '-', badgeClass: 'tp-badge-neutral' };
   }
+}
+
+export function formatCategoryInfo(category) {
+  switch (category) {
+    case 'sangat_pendek':
+      return { label: 'Sangat Pendek', shortLabel: 'SP', range: '<-3 SD', badgeClass: 'tp-badge-red' };
+    case 'pendek':
+      return { label: 'Pendek', shortLabel: 'P', range: '-3 s.d. <-2 SD', badgeClass: 'tp-badge-amber' };
+    case 'normal':
+      return { label: 'Normal', shortLabel: 'N', range: '-2 s.d. +3 SD', badgeClass: 'tp-badge-green' };
+    case 'tinggi':
+      return { label: 'Tinggi', shortLabel: 'T', range: '>+3 SD', badgeClass: 'tp-badge-blue' };
+    default:
+      return { label: 'Belum Diukur', shortLabel: '-', range: '', badgeClass: 'tp-badge-neutral' };
+  }
+}
+
+export function formatReviewStatusInfo(status) {
+  switch (status) {
+    case 'pending':
+      return { label: 'Perlu Tinjauan', badgeClass: 'tp-badge-amber' };
+    case 'remeasure_requested':
+    case 'flagged_for_remeasurement':
+      return { label: 'Ukur Ulang', badgeClass: 'tp-badge-red' };
+    case 'validated':
+    case 'confirmed':
+    case 'monitoring':
+      return { label: 'Tervalidasi', badgeClass: 'tp-badge-green' };
+    case 'not_flagged':
+      return { label: 'Normal', badgeClass: 'tp-badge-neutral' };
+    default:
+      return { label: status || '-', badgeClass: 'tp-badge-neutral' };
+  }
+}
+
+export function formatFollowUpStatusInfo(status, isOverdue = false) {
+  if (isOverdue && status !== 'closed') {
+    return { label: 'Terlambat', badgeClass: 'tp-badge-red' };
+  }
+  switch (status) {
+    case 'open':
+      return { label: 'Terbuka', badgeClass: 'tp-badge-amber' };
+    case 'in_progress':
+      return { label: 'Berjalan', badgeClass: 'tp-badge-blue' };
+    case 'closed':
+      return { label: 'Selesai', badgeClass: 'tp-badge-green' };
+    default:
+      return { label: status || '-', badgeClass: 'tp-badge-neutral' };
+  }
+}
+
+export function formatFollowUpTypeLabel(type) {
+  switch (type) {
+    case 'clinical_review':
+      return 'Konseling Gizi & Tinjauan Klinis';
+    case 'remeasurement':
+      return 'Pengukuran Ulang';
+    case 'operational_measurement':
+      return 'Kunjungan Rumah';
+    case 'Konseling Gizi':
+    case 'Pemberian PMT':
+    case 'Rujukan Puskesmas':
+    case 'Kunjungan Rumah':
+      return type;
+    default:
+      return type || '-';
+  }
+}
+
+export function formatPositionLabel(pos) {
+  if (pos === 'recumbent') return 'Terlentang (PB)';
+  if (pos === 'standing') return 'Berdiri (TB)';
+  return pos || '-';
+}
+
+export function calculateZScorePercent(zScore) {
+  const z = Number(zScore);
+  if (!Number.isFinite(z)) return 50;
+  const clamped = Math.max(-4, Math.min(4, z));
+  return ((clamped + 4) / 8) * 100;
 }
 
 export function getInitials(name) {

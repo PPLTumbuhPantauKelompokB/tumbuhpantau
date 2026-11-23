@@ -16,6 +16,9 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [feedback, setFeedback] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formState, setFormState] = useState({
@@ -316,6 +319,58 @@ export function UsersPage() {
 
       {errorMsg && <div className="alert alert-danger py-2 small">{errorMsg}</div>}
 
+      <div className="tp-filter-bar">
+        <div className="row g-2 align-items-center">
+          <div className="col-md-5">
+            <div className="tp-input-icon-group">
+              <span className="tp-input-icon-left">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                type="search"
+                className="form-control form-control-sm tp-input-with-icon"
+                style={{ minHeight: '38px' }}
+                placeholder="Cari nama pengguna, username, atau unit penempatan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari pengguna"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter Peran"
+            >
+              <option value="all">Semua Peran Sistem</option>
+              <option value="kader">Peran: Kader Posyandu</option>
+              <option value="petugas_puskesmas">Peran: Petugas Puskesmas</option>
+              <option value="dinas_kesehatan">Peran: Dinas Kesehatan</option>
+              <option value="administrator">Peran: Administrator</option>
+            </select>
+          </div>
+
+          <div className="col-md-4">
+            <select
+              className="form-select form-select-sm rounded-3"
+              style={{ minHeight: '38px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Urutkan Pengguna"
+            >
+              <option value="newest">Urutkan: Terbaru Dibuat</option>
+              <option value="az">Urutkan: Abjad Nama (A - Z)</option>
+              <option value="za">Urutkan: Abjad Nama (Z - A)</option>
+              <option value="oldest">Urutkan: Terlama Dibuat</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="tp-card p-0 overflow-hidden">
         {loading ? (
           <div className="text-center py-5 small text-secondary">Memuat daftar pengguna...</div>
@@ -333,7 +388,25 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => {
+                {users
+                  .filter((u) => {
+                    if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (u.name || '').toLowerCase().includes(q) ||
+                      (u.username || '').toLowerCase().includes(q) ||
+                      (u.organization_name || '').toLowerCase().includes(q) ||
+                      (u.organization_code || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .sort((a, b) => {
+                    if (sortBy === 'az') return (a.name || '').localeCompare(b.name || '', 'id');
+                    if (sortBy === 'za') return (b.name || '').localeCompare(a.name || '', 'id');
+                    if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+                    return Number(b.id) - Number(a.id);
+                  })
+                  .map((u) => {
                   const avatarTone = getAvatarToneClass(u.username);
                   const isCurrent = u.id === currentUser?.id;
 
